@@ -1,0 +1,14 @@
+{
+  "name": "seo-autopilot-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Central orchestration for the SEO Autopilot multi-agent system (Supabase task queue + Claude API agents, triggered by GitHub Actions).",
+  "scripts": {
+    "guardrail:run": "node src/runners/runPolicyGuardrail.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5"
+  }
+}
