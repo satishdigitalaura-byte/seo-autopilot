@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Central orchestration for the SEO Autopilot multi-agent system (Supabase task queue + Claude API agents, triggered by GitHub Actions).",
   "scripts": {
-    "guardrail:run": "node src/runners/runPolicyGuardrail.js"
+    "guardrail:run": "node src/runners/runPolicyGuardrail.js",
+    "content:run": "node src/runners/runContentDraft.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
