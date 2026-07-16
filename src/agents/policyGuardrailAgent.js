@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { runRuleChecks } from '../rules/guidelinesRuleset.js';
 import { generateText } from '../lib/llmClient.js';
+import { sendNotificationEmail } from '../lib/emailClient.js';
 
 async function runQualitativeCheck(payload) {
   const prompt = `You are a content policy checker for an SEO agency, applying Google's own published guidance (not invented AI-SEO tactics).
@@ -100,6 +101,25 @@ export async function processGuardrailTask(task) {
     payload: { ...task.payload, guardrailResult: resultSummary },
     status: 'awaiting_approval',
   });
+
+  try {
+    await sendNotificationEmail({
+      subject: `[Review needed] ${task.payload.title || task.payload.targetKeyword || 'New draft'} — ${site?.domain || ''}`,
+      html: `
+        <h2>A new draft passed quality checks and is ready for your review</h2>
+        <p><strong>Site:</strong> ${site?.domain || 'unknown'}</p>
+        <p><strong>Title:</strong> ${task.payload.title || '(no title)'}</p>
+        <p><strong>Slug:</strong> ${task.payload.slug || '(no slug)'}</p>
+        <p><strong>Excerpt:</strong> ${task.payload.excerpt || ''}</p>
+        <p><strong>Target keyword:</strong> ${task.payload.targetKeyword || ''}</p>
+        <p><strong>Why this was written:</strong> ${task.payload.triggerReason || ''}</p>
+        <hr/>
+        <p>This is not live yet — nothing publishes until a human approves it.</p>
+      `,
+    });
+  } catch (err) {
+    console.warn('Email notification failed (non-fatal):', err.message);
+  }
 
   return resultSummary;
 }

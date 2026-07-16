@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { getPageClicks } from '../lib/gscClient.js';
 import { getPageSessions } from '../lib/ga4Client.js';
+import { sendNotificationEmail } from '../lib/emailClient.js';
 
 /**
  * GSC/GA4 Watcher Agent — per SEO_AUTOPILOT_MASTER_ARCHITECTURE.md §2/§3.
@@ -132,6 +133,14 @@ export async function runWatcherForSite(site) {
   });
 
   if (isSuppressed) {
+    try {
+      await sendNotificationEmail({
+        subject: `[SEO Watcher] ${site.domain} — alerts paused (Google core update in progress)`,
+        html: `<p>A Google core/spam update is currently rolling out, so ranking volatility is expected and not a site-specific issue (Guidelines §8). Watcher data was still logged, but alert tasks were skipped for this run.</p>`,
+      });
+    } catch (err) {
+      console.warn('Email notification failed (non-fatal):', err.message);
+    }
     return { site: site.domain, pagesChecked: pages.size, findings: findings.length, tasksCreated: 0, suppressed: true };
   }
 
@@ -160,6 +169,38 @@ export async function runWatcherForSite(site) {
     action: 'watch_run_completed',
     details: { pagesChecked: pages.size, findingsCount: findings.length, tasksCreated },
   });
+
+  try {
+    if (findings.length > 0) {
+      await sendNotificationEmail({
+        subject: `[SEO Watcher] ${site.domain} — ${findings.length} page(s) lost significant traffic`,
+        html: `
+          <h2>${findings.length} page(s) on ${site.domain} lost significant search traffic</h2>
+          <p>Compared last 7 days (${current.startDate} to ${current.endDate}) vs the 7 days before (${previous.startDate} to ${previous.endDate}).</p>
+          <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
+            <tr><th>Page</th><th>Clicks before</th><th>Clicks now</th><th>Change</th><th>Position before</th><th>Position now</th></tr>
+            ${findings.slice(0, 15).map((f) => `
+              <tr>
+                <td>${f.url}</td>
+                <td>${f.clicksBefore}</td>
+                <td>${f.clicksAfter}</td>
+                <td>${f.changePct}%</td>
+                <td>${f.positionBefore}</td>
+                <td>${f.positionAfter}</td>
+              </tr>`).join('')}
+          </table>
+          <p>${tasksCreated} investigation task(s) queued for the Content Refresh Agent.</p>
+        `,
+      });
+    } else {
+      await sendNotificationEmail({
+        subject: `[SEO Watcher] ${site.domain} — all clear, no traffic drops`,
+        html: `<p>Checked ${pages.size} pages on ${site.domain}. No significant traffic drops found in the last 7 days vs. the prior 7 days. Nothing needs attention today.</p>`,
+      });
+    }
+  } catch (err) {
+    console.warn('Email notification failed (non-fatal):', err.message);
+  }
 
   return { site: site.domain, pagesChecked: pages.size, findings: findings.length, tasksCreated, suppressed: false };
 }
