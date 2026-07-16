@@ -3,6 +3,7 @@ import { runRuleChecks } from '../rules/guidelinesRuleset.js';
 import { generateText } from '../lib/llmClient.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell } from '../lib/emailTemplate.js';
+import { sendSlackApproval } from '../lib/slackClient.js';
 
 async function runQualitativeCheck(payload) {
   const prompt = `You are a content policy checker for an SEO agency, applying Google's own published guidance (not invented AI-SEO tactics).
@@ -94,14 +95,15 @@ export async function processGuardrailTask(task) {
     completed_at: new Date().toISOString(),
   }).eq('id', task.id);
 
-  await supabase.from('agent_tasks').insert({
+  const { data: reviewTaskRows } = await supabase.from('agent_tasks').insert({
     site_id: task.site_id,
     source_agent: 'policy_guardrail_agent',
     target_agent: 'human_review_queue',
     task_type: 'approve_draft',
     payload: { ...task.payload, guardrailResult: resultSummary },
     status: 'awaiting_approval',
-  });
+  }).select();
+  const reviewTask = reviewTaskRows?.[0];
 
   try {
     const bodyHtml = `
@@ -126,6 +128,14 @@ export async function processGuardrailTask(task) {
     });
   } catch (err) {
     console.warn('Email notification failed (non-fatal):', err.message);
+  }
+
+  try {
+    if (reviewTask) {
+      await sendSlackApproval({ ...reviewTask, siteDomain: site?.domain });
+    }
+  } catch (err) {
+    console.warn('Slack notification failed (non-fatal):', err.message);
   }
 
   return resultSummary;
