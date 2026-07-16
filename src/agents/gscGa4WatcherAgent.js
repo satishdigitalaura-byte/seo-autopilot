@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { getPageClicks } from '../lib/gscClient.js';
 import { getPageSessions } from '../lib/ga4Client.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
+import { renderEmailShell, renderBeforeAfterBars } from '../lib/emailTemplate.js';
 
 /**
  * GSC/GA4 Watcher Agent — per SEO_AUTOPILOT_MASTER_ARCHITECTURE.md §2/§3.
@@ -136,7 +137,12 @@ export async function runWatcherForSite(site) {
     try {
       await sendNotificationEmail({
         subject: `[SEO Watcher] ${site.domain} — alerts paused (Google core update in progress)`,
-        html: `<p>A Google core/spam update is currently rolling out, so ranking volatility is expected and not a site-specific issue (Guidelines §8). Watcher data was still logged, but alert tasks were skipped for this run.</p>`,
+        html: renderEmailShell({
+          badgeLabel: 'Paused',
+          badgeTone: 'info',
+          heading: `${site.domain} — alerts paused`,
+          bodyHtml: `<p>A Google core/spam update is currently rolling out, so ranking volatility is expected and not a site-specific issue. Watcher data was still logged, but alert tasks were skipped for this run.</p>`,
+        }),
       });
     } catch (err) {
       console.warn('Email notification failed (non-fatal):', err.message);
@@ -172,30 +178,37 @@ export async function runWatcherForSite(site) {
 
   try {
     if (findings.length > 0) {
+      const barsHtml = renderBeforeAfterBars(
+        findings.slice(0, 10).map((f) => ({
+          label: `${f.url} — ${f.changePct}% (position ${f.positionBefore} → ${f.positionAfter})`,
+          before: f.clicksBefore,
+          after: f.clicksAfter,
+        })),
+        { beforeLabel: 'Clicks — previous 7 days', afterLabel: 'Clicks — last 7 days' }
+      );
+
       await sendNotificationEmail({
         subject: `[SEO Watcher] ${site.domain} — ${findings.length} page(s) lost significant traffic`,
-        html: `
-          <h2>${findings.length} page(s) on ${site.domain} lost significant search traffic</h2>
-          <p>Compared last 7 days (${current.startDate} to ${current.endDate}) vs the 7 days before (${previous.startDate} to ${previous.endDate}).</p>
-          <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;">
-            <tr><th>Page</th><th>Clicks before</th><th>Clicks now</th><th>Change</th><th>Position before</th><th>Position now</th></tr>
-            ${findings.slice(0, 15).map((f) => `
-              <tr>
-                <td>${f.url}</td>
-                <td>${f.clicksBefore}</td>
-                <td>${f.clicksAfter}</td>
-                <td>${f.changePct}%</td>
-                <td>${f.positionBefore}</td>
-                <td>${f.positionAfter}</td>
-              </tr>`).join('')}
-          </table>
-          <p>${tasksCreated} investigation task(s) queued for the Content Refresh Agent.</p>
-        `,
+        html: renderEmailShell({
+          badgeLabel: 'Action Needed',
+          badgeTone: 'alert',
+          heading: `${findings.length} page${findings.length > 1 ? 's' : ''} lost significant traffic`,
+          bodyHtml: `
+            <p style="color:#6B7280;font-size:13px;margin-bottom:20px;">${current.startDate} → ${current.endDate} compared to the 7 days before (${previous.startDate} → ${previous.endDate})</p>
+            ${barsHtml}
+            <p style="margin-top:8px;">${tasksCreated} investigation task${tasksCreated === 1 ? '' : 's'} queued for review.</p>
+          `,
+        }),
       });
     } else {
       await sendNotificationEmail({
         subject: `[SEO Watcher] ${site.domain} — all clear, no traffic drops`,
-        html: `<p>Checked ${pages.size} pages on ${site.domain}. No significant traffic drops found in the last 7 days vs. the prior 7 days. Nothing needs attention today.</p>`,
+        html: renderEmailShell({
+          badgeLabel: 'All Clear',
+          badgeTone: 'good',
+          heading: `${site.domain} — no issues found`,
+          bodyHtml: `<p>Checked <strong>${pages.size} pages</strong> for the last 7 days vs. the prior 7 days. No significant traffic drops found. Nothing needs attention today.</p>`,
+        }),
       });
     }
   } catch (err) {

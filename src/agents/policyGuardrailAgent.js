@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { runRuleChecks } from '../rules/guidelinesRuleset.js';
 import { generateText } from '../lib/llmClient.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
+import { renderEmailShell } from '../lib/emailTemplate.js';
 
 async function runQualitativeCheck(payload) {
   const prompt = `You are a content policy checker for an SEO agency, applying Google's own published guidance (not invented AI-SEO tactics).
@@ -103,19 +104,25 @@ export async function processGuardrailTask(task) {
   });
 
   try {
+    const bodyHtml = `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+        <tr><td style="padding:4px 0;color:#6B7280;width:120px;">Site</td><td style="padding:4px 0;font-weight:600;">${site?.domain || 'unknown'}</td></tr>
+        <tr><td style="padding:4px 0;color:#6B7280;">Slug</td><td style="padding:4px 0;">${task.payload.slug || '(no slug)'}</td></tr>
+        <tr><td style="padding:4px 0;color:#6B7280;">Keyword</td><td style="padding:4px 0;">${task.payload.targetKeyword || ''}</td></tr>
+        <tr><td style="padding:4px 0;color:#6B7280;vertical-align:top;">Why written</td><td style="padding:4px 0;">${task.payload.triggerReason || ''}</td></tr>
+      </table>
+      <p style="margin-top:16px;padding:12px 16px;background:#F8FAFF;border-radius:8px;color:#374151;">${task.payload.excerpt || ''}</p>
+      <p style="margin-top:16px;font-size:13px;color:#6B7280;">This is not live yet &mdash; nothing publishes until a human approves it.</p>
+    `;
+
     await sendNotificationEmail({
       subject: `[Review needed] ${task.payload.title || task.payload.targetKeyword || 'New draft'} — ${site?.domain || ''}`,
-      html: `
-        <h2>A new draft passed quality checks and is ready for your review</h2>
-        <p><strong>Site:</strong> ${site?.domain || 'unknown'}</p>
-        <p><strong>Title:</strong> ${task.payload.title || '(no title)'}</p>
-        <p><strong>Slug:</strong> ${task.payload.slug || '(no slug)'}</p>
-        <p><strong>Excerpt:</strong> ${task.payload.excerpt || ''}</p>
-        <p><strong>Target keyword:</strong> ${task.payload.targetKeyword || ''}</p>
-        <p><strong>Why this was written:</strong> ${task.payload.triggerReason || ''}</p>
-        <hr/>
-        <p>This is not live yet — nothing publishes until a human approves it.</p>
-      `,
+      html: renderEmailShell({
+        badgeLabel: 'Review Needed',
+        badgeTone: 'info',
+        heading: task.payload.title || '(no title)',
+        bodyHtml,
+      }),
     });
   } catch (err) {
     console.warn('Email notification failed (non-fatal):', err.message);
