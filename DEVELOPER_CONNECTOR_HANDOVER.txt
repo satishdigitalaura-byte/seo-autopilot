@@ -1,0 +1,251 @@
+========================================================================
+ SEO AUTOPILOT — CONNECTOR INSTALL  (for the Digital Aura backend developer)
+========================================================================
+
+WHAT THIS IS
+------------
+A single Express route file to add to the existing "admin-backend"
+(Express 5 + Sequelize + MySQL). It lets our central SEO automation apply
+ALREADY-HUMAN-APPROVED changes to the site:
+
+  - publish/update a blog post
+  - set JSON-LD schema on a page/blog
+  - insert internal links into a blog
+  - regenerate sitemap.xml
+
+There is NO AI, NO scheduling, and NO decision-making in this file. All of
+that runs centrally (on our side). This file only:
+  1. Checks a secret header so random internet traffic can't call it.
+  2. Reads/writes the EXISTING Blog and Page Sequelize models.
+
+No DB schema changes. No new tables. No new npm packages.
+
+Estimated time: ~15 minutes.
+
+
+------------------------------------------------------------------------
+STEP 1 — Create the route file
+------------------------------------------------------------------------
+Create this file:
+
+    admin-backend/src/routes/seoAgent.js
+
+Paste the FULL code from the "CONNECTOR CODE" section at the bottom of
+this document into it.
+
+(It is also available in our repo:
+ github.com/satishdigitalaura-byte/seo-autopilot
+ -> integrations/thedigitalaura/seoAgent.js)
+
+
+------------------------------------------------------------------------
+STEP 2 — Mount the route
+------------------------------------------------------------------------
+In  admin-backend/src/server.js , add this line next to the other
+app.use('/api/...') route lines (put it ABOVE the handleRedirects line):
+
+    app.use('/api/seo-agent', require('./routes/seoAgent'));
+
+
+------------------------------------------------------------------------
+STEP 3 — Set environment variables (server / hosting panel)
+------------------------------------------------------------------------
+    SEO_AGENT_SHARED_SECRET=<the agency will send this to you privately>
+    SITE_BASE_URL=https://thedigitalaura.com
+
+    # optional — absolute path to write sitemap.xml.
+    # Defaults to ../../public/sitemap.xml relative to the route file.
+    # SITEMAP_PATH=/var/www/thedigitalaura/public/sitemap.xml
+
+IMPORTANT: The SEO_AGENT_SHARED_SECRET is a live password. Do NOT commit it
+to git (the repo is public). You will receive the exact value separately
+from the agency. It must match exactly on both sides.
+
+
+------------------------------------------------------------------------
+STEP 4 — Redeploy and verify
+------------------------------------------------------------------------
+After redeploying the backend, test:
+
+    curl -H "X-Seo-Agent-Secret: THE_SECRET" https://thedigitalaura.com/api/seo-agent/health
+
+Expected:  {"status":"ok","time":"..."}
+
+A request WITHOUT the correct secret must return: 401 unauthorized
+
+
+------------------------------------------------------------------------
+WHAT EACH ENDPOINT DOES  (all POST, all require the X-Seo-Agent-Secret header)
+------------------------------------------------------------------------
+POST /api/seo-agent/publish
+   Upserts a row in `blogs` by slug. Refuses unless body has
+   approvedByHuman:true. Writes as DRAFT by default; pass
+   cmsStatus:"published" to publish live automatically.
+
+POST /api/seo-agent/schema/update
+   Sets schema_code (JSON-LD) on a pages or blogs row by slug.
+
+POST /api/seo-agent/internal-links/apply
+   Inserts <a href> links into a blog post's content HTML (blogs only).
+
+POST /api/seo-agent/sitemap/regenerate
+   Writes sitemap.xml from all PUBLISHED pages + blogs.
+
+
+------------------------------------------------------------------------
+SAFETY NOTES
+------------------------------------------------------------------------
+- /publish is only ever called by us for content a human already approved,
+  AND this endpoint independently re-checks the approvedByHuman flag.
+- Defaults to DRAFT in the CMS, so nothing goes live until someone flips it
+  (or we explicitly send cmsStatus:"published").
+- GrapesJS pages (grapes_data) are NOT string-edited; only clean-HTML blog
+  content is touched for internal links.
+
+
+========================================================================
+ CONNECTOR CODE  ->  admin-backend/src/routes/seoAgent.js
+========================================================================
+
+const express = require('express');
+const router = express.Router();
+
+const Blog = require('../models/Blog');
+const Page = require('../models/Page');
+
+// ---- Auth middleware — do not remove ----
+function requireSharedSecret(req, res, next) {
+  const provided = req.header('X-Seo-Agent-Secret');
+  if (!provided || provided !== process.env.SEO_AGENT_SHARED_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  next();
+}
+
+router.use(express.json({ limit: '2mb' }));
+router.use(requireSharedSecret);
+
+// Drop keys whose value is undefined so we never overwrite a column with null.
+function pruneUndefined(obj) {
+  Object.keys(obj).forEach((k) => obj[k] === undefined && delete obj[k]);
+  return obj;
+}
+
+// ---- Health ----
+router.get('/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// ---- PUBLISH — upsert a blog post by slug ----
+router.post('/publish', async (req, res) => {
+  if (req.body.approvedByHuman !== true) {
+    return res.status(403).json({ error: 'missing approvedByHuman flag — refusing to publish' });
+  }
+  try {
+    const {
+      slug, title, content, excerpt, metaTitle, metaDescription,
+      keywords, category, tags, cmsStatus,
+    } = req.body;
+    if (!slug || !title) return res.status(400).json({ error: 'slug and title are required' });
+
+    const fields = pruneUndefined({
+      title,
+      content,
+      excerpt,
+      meta_title: metaTitle,
+      meta_desc: metaDescription,
+      keywords,
+      category,
+      tags: Array.isArray(tags) ? JSON.stringify(tags) : undefined,
+      status: cmsStatus === 'published' ? 'published' : 'draft',
+    });
+
+    const existing = await Blog.findOne({ where: { slug } });
+    const blog = existing ? await existing.update(fields) : await Blog.create({ slug, ...fields });
+    res.json({ status: 'ok', action: existing ? 'updated' : 'created', id: blog.id, cmsStatus: fields.status });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- SCHEMA UPDATE — set JSON-LD (schema_code) on a page or blog by slug ----
+router.post('/schema/update', async (req, res) => {
+  try {
+    const { slug, jsonLd } = req.body;
+    if (!slug || !jsonLd) return res.status(400).json({ error: 'slug and jsonLd are required' });
+    const code = typeof jsonLd === 'string' ? jsonLd : JSON.stringify(jsonLd);
+
+    let target = await Page.findOne({ where: { slug } });
+    let type = 'page';
+    if (!target) { target = await Blog.findOne({ where: { slug } }); type = 'blog'; }
+    if (!target) return res.status(404).json({ error: `no page/blog with slug "${slug}"` });
+
+    await target.update({ schema_code: code });
+    res.json({ status: 'ok', type, id: target.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- INTERNAL LINKS — insert links into a blog post's HTML content (blogs only) ----
+router.post('/internal-links/apply', async (req, res) => {
+  try {
+    const { slug, links } = req.body; // links: [{ anchorText, targetUrl }]
+    if (!slug || !Array.isArray(links)) return res.status(400).json({ error: 'slug and links[] are required' });
+
+    const blog = await Blog.findOne({ where: { slug } });
+    if (!blog) return res.status(404).json({ error: `no blog with slug "${slug}"` });
+
+    let html = blog.content || '';
+    let added = 0;
+    for (const { anchorText, targetUrl } of links) {
+      if (!anchorText || !targetUrl) continue;
+      if (html.includes(`href="${targetUrl}"`)) continue; // already linked
+      const escaped = anchorText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`\\b(${escaped})\\b`);
+      if (re.test(html)) {
+        html = html.replace(re, `<a href="${targetUrl}">$1</a>`);
+        added++;
+      }
+    }
+    await blog.update({ content: html });
+    res.json({ status: 'ok', id: blog.id, linksAdded: added });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- SITEMAP — regenerate from published pages + blogs ----
+router.post('/sitemap/regenerate', async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const baseUrl = (process.env.SITE_BASE_URL || 'https://thedigitalaura.com').replace(/\/+$/, '');
+
+    const [pages, blogs] = await Promise.all([
+      Page.findAll({ where: { status: 'published' } }),
+      Blog.findAll({ where: { status: 'published' } }),
+    ]);
+    const urls = [
+      ...pages.map((p) => `${baseUrl}/${p.slug}`),
+      ...blogs.map((b) => `${baseUrl}/blog/${b.slug}`),
+    ];
+    const xml =
+      `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+      urls.map((u) => `  <url><loc>${u}</loc></url>`).join('\n') +
+      `\n</urlset>\n`;
+
+    const outPath = process.env.SITEMAP_PATH || path.join(__dirname, '../../../public/sitemap.xml');
+    fs.writeFileSync(outPath, xml, 'utf8');
+    res.json({ status: 'ok', urlCount: urls.length, wrote: outPath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
+
+========================================================================
+ END
+========================================================================
