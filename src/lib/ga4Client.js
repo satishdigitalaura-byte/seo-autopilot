@@ -49,3 +49,18 @@ export async function getPageSessions(propertyId, startDate, endDate) {
   }
   return byPage;
 }
+
+/**
+ * CRO signal: pages that bring meaningful traffic but convert poorly (or not
+ * at all). High traffic + low conversion is exactly where a content/CTA
+ * change has the most leverage — fixing a low-traffic page's conversion rate
+ * matters far less in absolute terms.
+ */
+export async function getConversionOpportunities(propertyId, startDate, endDate, { minSessions = 20 } = {}) {
+  const byPage = await getPageSessions(propertyId, startDate, endDate);
+  const rows = [...byPage.entries()]
+    .map(([path, m]) => ({ path, sessions: m.sessions, conversions: m.conversions, conversionRate: m.sessions ? m.conversions / m.sessions : 0 }))
+    .filter((r) => r.sessions >= minSessions)
+    .sort((a, b) => a.conversionRate - b.conversionRate || b.sessions - a.sessions);
+  return rows.slice(0, 10);
+}
