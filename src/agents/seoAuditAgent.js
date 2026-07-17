@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
-import { getStrikingDistanceQueries, getUnderperformingCtrPages, getQueryMovement } from '../lib/gscClient.js';
+import { getStrikingDistanceQueries, getUnderperformingCtrPages, getQueryMovement, getContentGapQueries } from '../lib/gscClient.js';
 import { getConversionOpportunities } from '../lib/ga4Client.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell } from '../lib/emailTemplate.js';
@@ -19,6 +19,10 @@ import { renderEmailShell } from '../lib/emailTemplate.js';
  *     than page-level, catches cannibalization/shifts a page-level view misses).
  *  4. GA4 conversion opportunities — high traffic, low conversion pages
  *     (Guidelines-aligned CRO signal: fix the highest-leverage page first).
+ *  5. Content gap candidates (position 21-50) — real queries with proven
+ *     topical relevance but stuck on page 3+, flagged for a human to decide
+ *     whether a new page is worth building (needs a real ORIGINAL ELEMENT
+ *     before content_draft_agent can act on it — this only surfaces the gap).
  *
  * Uses a 28-day window (vs. the Watcher's 7-day drop-detection window)
  * because these signals need more data to be meaningful/stable.
@@ -53,10 +57,11 @@ export async function runAuditForSite(site) {
   const current = dateRange(31, 3);   // 28-day window ending 3 days ago (GSC lag)
   const previous = dateRange(59, 31); // the 28 days before that
 
-  const [strikingDistance, underperformingCtr, queryMovement] = await Promise.all([
+  const [strikingDistance, underperformingCtr, queryMovement, contentGaps] = await Promise.all([
     getStrikingDistanceQueries(credMap.gsc_property, current.startDate, current.endDate),
     getUnderperformingCtrPages(credMap.gsc_property, current.startDate, current.endDate),
     getQueryMovement(credMap.gsc_property, current, previous),
+    getContentGapQueries(credMap.gsc_property, current.startDate, current.endDate),
   ]);
 
   let conversionOpportunities = [];
@@ -75,6 +80,8 @@ export async function runAuditForSite(site) {
     underperformingCtr: underperformingCtr.slice(0, 10),
     queryMovement,
     conversionOpportunities,
+    contentGapCount: contentGaps.length,
+    contentGaps: contentGaps.slice(0, 15),
   };
 
   await supabase.from('agent_results').insert({
@@ -127,6 +134,11 @@ function buildAuditEmail(site, r) {
     c.path, `${c.sessions} sessions`, `${c.conversions} conversions`, `${(c.conversionRate * 100).toFixed(2)}%`,
   ])).join('') || row(['Not enough GA4 data this period.', '', '', '']);
 
+  const gapRows = r.contentGaps.slice(0, 10).map((g) => row([
+    `<strong>${g.query}</strong><br/><span style="color:#6B7280;font-size:11px;">currently landing on: ${g.page.replace(/^https?:\/\/[^/]+/, '')}</span>`,
+    `Pos ${g.position.toFixed(1)}`, `${g.impressions} impr.`,
+  ])).join('') || row(['No content-gap candidates found this period.', '', '']);
+
   const bodyHtml = `
     <p style="color:#6B7280;font-size:13px;">${r.dateRanges.current.startDate} → ${r.dateRanges.current.endDate} (28-day window)</p>
 
@@ -147,6 +159,10 @@ function buildAuditEmail(site, r) {
     <h3 style="color:#0A1628;font-size:15px;margin:20px 0 4px;">💰 CRO opportunities (GA4)</h3>
     <p style="color:#6B7280;font-size:12px;margin:0 0 4px;">High traffic, low conversion — the highest-leverage pages to improve.</p>
     ${table(['Page', 'Sessions', 'Conversions', 'Rate'], croRows)}
+
+    <h3 style="color:#0A1628;font-size:15px;margin:20px 0 4px;">🆕 Content gap candidates (page 3+, position 21-50)</h3>
+    <p style="color:#6B7280;font-size:12px;margin:0 0 4px;">Real queries already tied to this site but stuck deep — worth considering a dedicated new page. Needs a real client fact/case-study to write from, doesn't auto-draft.</p>
+    ${table(['Query', 'Position', 'Impressions'], gapRows)}
   `;
 
   return renderEmailShell({

@@ -96,6 +96,32 @@ export async function getUnderperformingCtrPages(propertyUrl, startDate, endDate
     .sort((a, b) => a.ctrGapPct - b.ctrGapPct);
 }
 
+/**
+ * Content gap candidates — real queries Google already associates with this
+ * site (proof of topical relevance) that are stuck on page 3+ (position
+ * 21-50), with real impression volume. Deliberately excludes position 4-20
+ * (that's `getStrikingDistanceQueries`'s job — a cheaper win) so the two
+ * reports don't overlap. A query stuck this far down usually means either no
+ * dedicated page exists for it, or the existing page doesn't cover it well
+ * enough — worth a human decision on whether a new page is warranted, using
+ * a real client fact as the ORIGINAL ELEMENT per Guidelines §6 (this
+ * function only surfaces the opportunity, it never invents content).
+ */
+export async function getContentGapQueries(propertyUrl, startDate, endDate, { rowLimit = 1000, minImpressions = 15, minPosition = 21, maxPosition = 50 } = {}) {
+  const authClient = await getGoogleAuthClient(SCOPES);
+  const searchconsole = google.searchconsole({ version: 'v1', auth: authClient });
+
+  const res = await searchconsole.searchanalytics.query({
+    siteUrl: propertyUrl,
+    requestBody: { startDate, endDate, dimensions: ['query', 'page'], rowLimit },
+  });
+
+  return (res.data.rows || [])
+    .filter((r) => r.position >= minPosition && r.position <= maxPosition && r.impressions >= minImpressions)
+    .map((r) => ({ query: r.keys[0], page: r.keys[1], clicks: r.clicks, impressions: r.impressions, ctr: r.ctr, position: r.position }))
+    .sort((a, b) => b.impressions - a.impressions);
+}
+
 /** Top gaining and losing queries between two periods — real query-level movement, not just page-level. */
 export async function getQueryMovement(propertyUrl, current, previous, { rowLimit = 1000 } = {}) {
   const authClient = await getGoogleAuthClient(SCOPES);
