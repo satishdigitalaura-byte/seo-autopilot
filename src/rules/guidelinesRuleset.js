@@ -67,6 +67,26 @@ function checkContentLength(payload) {
   };
 }
 
+function checkNoExternalLinks(payload, site) {
+  const siteHost = (site?.domain || '').replace(/^www\./, '').toLowerCase();
+  const hrefs = [...(payload.content || '').matchAll(/<a\s+[^>]*href=["']([^"']+)["']/gi)].map((m) => m[1]);
+  const externalHrefs = hrefs.filter((href) => {
+    if (href.startsWith('#') || href.startsWith('/') || href.startsWith('mailto:') || href.startsWith('tel:')) return false;
+    try {
+      const host = new URL(href).hostname.replace(/^www\./, '').toLowerCase();
+      return siteHost ? host !== siteHost : true;
+    } catch {
+      return false;
+    }
+  });
+  return {
+    id: 'no_external_links',
+    passed: externalHrefs.length === 0,
+    severity: 'reject',
+    detail: externalHrefs.length ? `Found ${externalHrefs.length} link(s) off-site: ${externalHrefs.join(', ')}` : null,
+  };
+}
+
 function checkOriginalElement(payload) {
   const hasOriginal = typeof payload.originalElement === 'string' && payload.originalElement.trim().length > 0;
   return {
@@ -140,6 +160,7 @@ export function runRuleChecks(payload, site) {
     checkHiddenText(content),
     checkKeywordStuffing(content, payload.targetKeyword),
     checkContentLength(payload),
+    checkNoExternalLinks(payload, site),
     checkOriginalElement(payload),
     checkScaledAbuse(payload),
     checkSneakyRedirect(payload, site),

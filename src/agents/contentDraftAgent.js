@@ -120,7 +120,7 @@ ${keywordResearch.realQueriesUsed?.length ? `Real queries already bringing visit
 15. IMAGES: do NOT invent, hallucinate, or fabricate image files/URLs — no real image pipeline exists yet. Instead, output an "imagePlacements" array (see JSON schema) naming where images SHOULD go and their ideal SEO filename + alt text, for a human to add later. Do not put fake <img> tags in the HTML.
 16. INTERNAL LINKS: naturally weave in 3-8 links if enough real candidates exist (use as many of the real list below as make sense — never fewer than what naturally fits, never invent a URL):
 ${linkList}
-17. EXTERNAL LINKS: where genuinely useful, link out 1-3 times to real, well-known authority sources (e.g. Google Search Central, Google Search Console Help, PageSpeed Insights, or another globally recognized authority actually relevant to the topic) — use real, correct URLs for well-known resources only; if unsure of the exact URL, do not include the link.
+17. EXTERNAL LINKS: NEVER link out to any domain other than ${site?.domain || 'this site'}. No links to Google, competitors, sources, "further reading," or any other outside website — every single <a href> in the content must point only to an internal page from the list above (or omit the link entirely if no internal page fits naturally). If you'd normally cite an outside authority, mention it by name in plain text without a link instead.
 18. FAQ SECTION: include 3-6 genuinely useful questions and concise answers relevant to this exact topic (return in the "faqs" field, and also render them as a visible FAQ section in the HTML near the end, before the CTA).
 19. SCHEMA: handled outside this prompt (BlogPosting + FAQPage + Author + Organization) — just make sure your "faqs" and "authorBio" fields are filled in accurately since they feed the schema.
 20. AUTHOR SECTION: fill "authorBio" with a short (1-2 sentence) bio establishing relevant expertise${p.authorName ? ` for ${p.authorName}${p.authorCredentials ? ` (${p.authorCredentials})` : ''}` : ' for the agency as the author (no named individual was supplied for this draft)'}.
@@ -163,7 +163,7 @@ Return ONLY a JSON object, no other text:
   // model also can't sustain 1800+ words regardless of token budget, so competitive/pillar
   // topics get bumped to the full gemini-2.5-flash model — everything else stays on the
   // free lite model to keep this near-$0.
-  const maxTokens = isCompetitiveTopic ? 14000 : 6000;
+  const maxTokens = isCompetitiveTopic ? 16000 : 6000;
   const model = isCompetitiveTopic ? 'gemini-flash-latest' : undefined;
   const raw = await generateText({ prompt, maxTokens, temperature: 0.6, model });
 
