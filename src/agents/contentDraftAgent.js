@@ -106,7 +106,13 @@ ${keywordResearch.realQueriesUsed?.length ? `Real queries already bringing visit
 9. H1: exactly one, close to the primary keyword.
 10. H2 STRUCTURE: multiple clear H2 sections that each cover one distinct subtopic — no rambling single-H2 walls of text.
 11. H3: only where an H2 section genuinely needs sub-points.
-12. INTRODUCTION: the primary keyword must appear naturally within the first ~100 words, and the intro must directly address search intent — no throat-clearing.
+12. INTRODUCTION — ABSOLUTELY NO FILLER OPENER: the very first sentence must be a substantive, specific claim or fact — never generic throat-clearing. This gets content auto-rejected, so treat it as a hard stop, not a style preference. BANNED as an opening sentence (do not paraphrase these either — no sentence with this shape, about any topic):
+   - "In [year]/today's [industry/digital] landscape, ..."
+   - "In the ever-evolving world of ..."
+   - "When it comes to [topic], ..."
+   - "In today's fast-paced/digital world, ..."
+   - Any sentence whose only job is to announce the topic generically before saying anything real.
+   Instead, open with the ORIGINAL ELEMENT itself, a specific number/result, or a direct claim that could only be written by someone who actually did the work. Example of the difference: BAD — "In 2026, the landscape of SEO has shifted." GOOD — "We took a hotel client's booking page from page 5 to the #1 spot for 'jacuzzi suites near me' in 90 days — here's the exact on-page framework we used." The primary keyword must still appear naturally within the first ~100 words, and the intro must directly address search intent.
 13. KEYWORD DENSITY: natural, not stuffed — roughly primary keyword 5-8x per 1000 words, secondary 2-4x each, long-tail 1-2x, NLP terms sprinkled as topically relevant. Never force a count at the cost of readability.
 14. CONTENT LENGTH: target ${wordTarget} — driven by what the topic actually needs, not padding to hit a number.
 15. IMAGES: do NOT invent, hallucinate, or fabricate image files/URLs — no real image pipeline exists yet. Instead, output an "imagePlacements" array (see JSON schema) naming where images SHOULD go and their ideal SEO filename + alt text, for a human to add later. Do not put fake <img> tags in the HTML.
