@@ -165,13 +165,20 @@ Return ONLY a JSON object, no other text:
 
   // Token budget must comfortably fit the full HTML article (up to 2800 words ≈ 3800 tokens)
   // plus JSON overhead (title/meta/faqs/imagePlacements) — 4500 was silently truncating
-  // competitive/pillar topics well short of the required word minimum. The default "lite"
-  // model also can't sustain 1800+ words regardless of token budget, so competitive/pillar
-  // topics get bumped to the full gemini-2.5-flash model — everything else stays on the
-  // free lite model to keep this near-$0.
-  const maxTokens = isCompetitiveTopic ? 16000 : 6000;
-  const model = isCompetitiveTopic ? 'gemini-flash-latest' : undefined;
-  const raw = await generateText({ prompt, maxTokens, temperature: 0.6, model });
+  // competitive/pillar topics well short of the required word minimum. Live testing showed
+  // the default "lite" model under-delivers on word count even for the smaller 1000-1600
+  // target (consistently 600-800 words across repeated runs), not just 1800+ pillar topics —
+  // so every draft now uses the full gemini-flash-latest model; still free tier, still near-$0.
+  const maxTokens = isCompetitiveTopic ? 16000 : 9000;
+  let raw;
+  try {
+    raw = await generateText({ prompt, maxTokens, temperature: 0.6, model: 'gemini-flash-latest' });
+  } catch (err) {
+    // gemini-flash-latest occasionally 503s under high demand — fall back to the
+    // lite model rather than blocking the whole pipeline on a transient outage.
+    console.warn('gemini-flash-latest unavailable, falling back to lite model:', err.message);
+    raw = await generateText({ prompt, maxTokens, temperature: 0.6 });
+  }
 
   let draft;
   try {
