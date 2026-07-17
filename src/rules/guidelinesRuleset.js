@@ -67,6 +67,42 @@ function checkContentLength(payload) {
   };
 }
 
+/**
+ * Catches content that will visually break the site's design when rendered —
+ * the page shell (header/footer/colors/fonts) always matches the site since
+ * every blog route renders through the same template, but the article BODY
+ * itself can still leak things that look broken: raw JSON/schema code dumped
+ * as visible text (a real bug caught live — a draft included a whole
+ * "Technical SEO & Schema" section with the actual JSON-LD block printed as
+ * page content), un-rendered Markdown syntax, or raw inline styles/fonts that
+ * fight the site's own CSS.
+ */
+function checkDesignSafeMarkup(payload) {
+  const html = payload.content || '';
+  const bodyText = stripHtml(html);
+  const issues = [];
+
+  if (/["']?@context["']?\s*:\s*["']https?:\/\/schema\.org["']/i.test(bodyText)) {
+    issues.push('raw JSON-LD/schema code appears to be printed as visible article text');
+  }
+  if (/```|(^|\s)#{1,6}\s|\*\*[^*]+\*\*/m.test(bodyText)) {
+    issues.push('un-rendered Markdown syntax (```, #, or **bold**) found in body text');
+  }
+  if (/style\s*=\s*["'][^"']*["']/i.test(html)) {
+    issues.push('inline style="" attribute found — can clash with the site\'s own design system');
+  }
+  if (/<font[\s>]/i.test(html)) {
+    issues.push('legacy <font> tag found');
+  }
+
+  return {
+    id: 'design_safe_markup',
+    passed: issues.length === 0,
+    severity: 'reject',
+    detail: issues.length ? issues.join('; ') : null,
+  };
+}
+
 function checkNoExternalLinks(payload, site) {
   const siteHost = (site?.domain || '').replace(/^www\./, '').toLowerCase();
   const hrefs = [...(payload.content || '').matchAll(/<a\s+[^>]*href=["']([^"']+)["']/gi)].map((m) => m[1]);
@@ -160,6 +196,7 @@ export function runRuleChecks(payload, site) {
     checkHiddenText(content),
     checkKeywordStuffing(content, payload.targetKeyword),
     checkContentLength(payload),
+    checkDesignSafeMarkup(payload),
     checkNoExternalLinks(payload, site),
     checkOriginalElement(payload),
     checkScaledAbuse(payload),
