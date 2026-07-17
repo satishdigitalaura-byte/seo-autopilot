@@ -5,12 +5,7 @@
  * browser (a plain GET request straight to our Supabase Edge Function),
  * so there's no need for Slack's interactivity payload/signature handling.
  */
-const FUNCTIONS_BASE = 'https://wrmgdcmyirnybybqlqll.supabase.co/functions/v1/approve-task';
-
-function approveUrl(taskId, action) {
-  const secret = process.env.APPROVE_SECRET;
-  return `${FUNCTIONS_BASE}?id=${taskId}&action=${action}&secret=${secret}`;
-}
+import { approveUrl } from './approvalLinks.js';
 
 export async function sendSlackApproval(task) {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;

@@ -2,8 +2,9 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { runRuleChecks } from '../rules/guidelinesRuleset.js';
 import { generateText } from '../lib/llmClient.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
-import { renderEmailShell } from '../lib/emailTemplate.js';
+import { renderEmailShell, renderApprovalButtons } from '../lib/emailTemplate.js';
 import { sendSlackApproval } from '../lib/slackClient.js';
+import { approveUrl } from '../lib/approvalLinks.js';
 
 async function runQualitativeCheck(payload) {
   const prompt = `You are a content policy checker for an SEO agency, applying Google's own published guidance (not invented AI-SEO tactics).
@@ -115,6 +116,7 @@ export async function processGuardrailTask(task) {
       </table>
       <p style="margin-top:16px;padding:12px 16px;background:#F8FAFF;border-radius:8px;color:#374151;">${task.payload.excerpt || ''}</p>
       <p style="margin-top:16px;font-size:13px;color:#6B7280;">This is not live yet &mdash; nothing publishes until a human approves it.</p>
+      ${reviewTask ? renderApprovalButtons({ approveHref: approveUrl(reviewTask.id, 'approve'), rejectHref: approveUrl(reviewTask.id, 'reject') }) : ''}
     `;
 
     await sendNotificationEmail({
