@@ -70,15 +70,11 @@
 
 <div id="login-screen" class="login-box">
   <h1>SEO Autopilot Panel</h1>
-  <p style="color:var(--gray);font-size:14px;">Login with your email — no password needed.</p>
+  <p style="color:var(--gray);font-size:14px;">Login with your email and password.</p>
   <div id="step-email">
     <input id="email-input" type="email" placeholder="you@digitalaura.com" />
-    <button class="primary" id="send-code-btn" onclick="sendCode()">Send Login Code</button>
-  </div>
-  <div id="step-otp" style="display:none;">
-    <p style="font-size:13px;color:var(--gray);">Enter the 6-digit code sent to your email.</p>
-    <input id="otp-input" type="text" placeholder="123456" maxlength="6" />
-    <button class="primary" id="verify-code-btn" onclick="verifyCode()">Login</button>
+    <input id="password-input" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="primary" id="login-btn" onclick="doLogin()">Login</button>
   </div>
   <div id="login-status" class="status-msg"></div>
 </div>
@@ -121,28 +117,12 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 window.supabase = supabase;
 
-let currentEmail = '';
-
-window.sendCode = async function () {
+window.doLogin = async function () {
   const email = document.getElementById('email-input').value.trim();
-  if (!email) return;
-  currentEmail = email;
-  setLoginStatus('Sending code…', '');
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
-  if (error) {
-    setLoginStatus(error.message, 'error');
-    return;
-  }
-  document.getElementById('step-email').style.display = 'none';
-  document.getElementById('step-otp').style.display = 'block';
-  setLoginStatus('Code sent — check your email.', 'ok');
-};
-
-window.verifyCode = async function () {
-  const token = document.getElementById('otp-input').value.trim();
-  if (!token) return;
-  setLoginStatus('Verifying…', '');
-  const { error } = await supabase.auth.verifyOtp({ email: currentEmail, token, type: 'email' });
+  const password = document.getElementById('password-input').value;
+  if (!email || !password) return;
+  setLoginStatus('Logging in…', '');
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     setLoginStatus(error.message, 'error');
     return;
@@ -154,10 +134,8 @@ window.logout = async function () {
   await supabase.auth.signOut();
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('login-screen').style.display = 'block';
-  document.getElementById('step-email').style.display = 'block';
-  document.getElementById('step-otp').style.display = 'none';
   document.getElementById('email-input').value = '';
-  document.getElementById('otp-input').value = '';
+  document.getElementById('password-input').value = '';
 };
 
 function setLoginStatus(msg, cls) {
