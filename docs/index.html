@@ -6,62 +6,109 @@
 <title>SEO Autopilot — Panel</title>
 <style>
   :root {
-    --dark: #0A1628; --blue: #1A6FE8; --orange: #FF6B2B;
-    --green: #22C55E; --red: #EF4444; --gray: #6B7280;
-    --bg: #F8FAFF; --border: #E5E7EB;
+    --dark: #0A1628; --dark2: #132038; --blue: #1A6FE8; --orange: #FF6B2B;
+    --green: #22C55E; --red: #EF4444; --gray: #6B7280; --gray-light: #9CA3AF;
+    --bg: #F4F6FB; --card: #FFFFFF; --border: #E5E7EB;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg); color: #1F2937;
+    background: var(--bg); color: #1F2937; -webkit-font-smoothing: antialiased;
   }
   header {
-    background: var(--dark); color: #fff; padding: 18px 24px;
+    background: linear-gradient(135deg, var(--dark), var(--dark2));
+    color: #fff; padding: 18px 28px;
     display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(10,22,40,0.15);
   }
-  header .brand { font-size: 18px; font-weight: 700; }
-  header .brand span { color: var(--gray); font-size: 13px; font-weight: 400; margin-left: 8px; }
+  header .brand { display: flex; align-items: center; gap: 10px; }
+  header .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 4px rgba(255,107,43,0.2); }
+  header .brand-text { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+  header .brand-text span { color: #9CA9C7; font-size: 12px; font-weight: 500; margin-left: 8px; }
   header button {
-    background: transparent; border: 1px solid #374151; color: #fff;
-    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: background 0.15s;
   }
-  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
+  header button:hover { background: rgba(255,255,255,0.16); }
+  main { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 20px; box-shadow: 0 1px 3px rgba(16,24,40,0.04);
+  }
+  .stat-card .stat-num { font-size: 28px; font-weight: 800; color: var(--dark); line-height: 1; }
+  .stat-card .stat-label { font-size: 12px; color: var(--gray); margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-card.accent-orange .stat-num { color: var(--orange); }
+  .stat-card.accent-green .stat-num { color: var(--green); }
+  .stat-card.accent-red .stat-num { color: var(--red); }
+
   .card {
-    background: #fff; border: 1px solid var(--border); border-radius: 12px;
-    padding: 20px 24px; margin-bottom: 20px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 22px 26px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(16,24,40,0.04);
   }
-  h2 { font-size: 16px; color: var(--dark); margin: 0 0 16px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  h2 { font-size: 16px; color: var(--dark); margin: 0; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .card-sub { font-size: 12px; color: var(--gray); margin-top: 2px; font-weight: 500; }
+
   .login-box {
-    max-width: 380px; margin: 80px auto; text-align: center;
+    max-width: 380px; margin: 90px auto; text-align: center;
+    background: var(--card); border-radius: 18px; padding: 40px 32px;
+    box-shadow: 0 8px 30px rgba(16,24,40,0.08); border: 1px solid var(--border);
   }
-  .login-box h1 { font-size: 20px; color: var(--dark); }
+  .login-box .logo-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--orange); margin: 0 auto 14px; box-shadow: 0 0 0 5px rgba(255,107,43,0.15); }
+  .login-box h1 { font-size: 21px; color: var(--dark); margin: 0 0 4px; font-weight: 800; }
+
   input, select, textarea {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
-    font-size: 14px; margin-bottom: 12px; font-family: inherit;
+    width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px;
+    font-size: 14px; margin-bottom: 12px; font-family: inherit; background: #FAFBFF;
+    transition: border-color 0.15s;
   }
-  textarea { min-height: 80px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); background: #fff; }
+  textarea { min-height: 84px; resize: vertical; }
+
   button.primary {
-    background: var(--blue); color: #fff; border: none; padding: 10px 18px;
-    border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;
+    background: var(--blue); color: #fff; border: none; padding: 11px 20px;
+    border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 14px;
+    transition: background 0.15s; width: 100%;
   }
+  button.primary:hover { background: #1558bf; }
   button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
-  button.approve { background: var(--green); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-right: 8px; }
-  button.reject { background: var(--red); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-  .draft-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
-  .draft-item:last-child { border-bottom: none; }
-  .draft-title { font-weight: 700; color: var(--dark); margin-bottom: 4px; }
-  .draft-meta { font-size: 12px; color: var(--gray); margin-bottom: 8px; }
-  .draft-excerpt { font-size: 14px; color: #374151; margin-bottom: 12px; }
+  button.approve { background: var(--green); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; margin-right: 8px; font-size: 13px; }
+  button.reject { background: var(--red); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; }
+  button.approve:hover { background: #16a34a; } button.reject:hover { background: #dc2626; }
+
+  .draft-item { border-bottom: 1px solid var(--border); padding: 18px 0; }
+  .draft-item:last-child { border-bottom: none; padding-bottom: 4px; }
+  .draft-item:first-child { padding-top: 4px; }
+  .draft-title { font-weight: 700; color: var(--dark); margin-bottom: 4px; font-size: 15px; }
+  .draft-meta { font-size: 12px; color: var(--gray); margin-bottom: 10px; }
+  .draft-excerpt { font-size: 13.5px; color: #374151; margin-bottom: 14px; line-height: 1.5; }
+
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .agent-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; background: #FAFBFF; }
+  .agent-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .agent-name { font-weight: 700; font-size: 13.5px; color: var(--dark); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.live { background: var(--green); box-shadow: 0 0 0 3px rgba(34,197,94,0.18); }
+  .status-dot.stale { background: var(--orange); box-shadow: 0 0 0 3px rgba(255,107,43,0.15); }
+  .status-dot.none { background: var(--gray-light); }
+  .agent-desc { font-size: 12px; color: var(--gray); line-height: 1.5; margin-bottom: 10px; }
+  .agent-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--gray-light); font-weight: 600; }
+
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; padding: 8px; color: var(--gray); border-bottom: 1px solid var(--border); font-weight: 600; }
-  td { padding: 8px; border-bottom: 1px solid var(--border); }
-  .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  th { text-align: left; padding: 10px 8px; color: var(--gray); border-bottom: 2px solid var(--border); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: #FAFBFF; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-block; }
   .badge.awaiting_approval, .badge.pending { background: #FEF3C7; color: #92400E; }
   .badge.completed, .badge.approved { background: #DCFCE7; color: #166534; }
   .badge.rejected, .badge.failed { background: #FEE2E2; color: #991B1B; }
   .badge.in_progress { background: #DBEAFE; color: #1E40AF; }
-  .empty { color: var(--gray); font-size: 14px; padding: 12px 0; }
-  .status-msg { font-size: 13px; margin-top: 10px; }
+
+  .empty { color: var(--gray); font-size: 13.5px; padding: 8px 0; }
+  .status-msg { font-size: 13px; margin-top: 10px; font-weight: 600; }
   .status-msg.error { color: var(--red); }
   .status-msg.ok { color: var(--green); }
 </style>
@@ -69,8 +116,9 @@
 <body>
 
 <div id="login-screen" class="login-box">
+  <div class="logo-dot"></div>
   <h1>SEO Autopilot Panel</h1>
-  <p style="color:var(--gray);font-size:14px;">Login with your email and password.</p>
+  <p style="color:var(--gray);font-size:13.5px;margin-bottom:22px;">Digital Aura — sign in to continue</p>
   <div id="step-email">
     <input id="email-input" type="email" placeholder="you@digitalaura.com" />
     <input id="password-input" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
@@ -81,27 +129,37 @@
 
 <div id="app-screen" style="display:none;">
   <header>
-    <div class="brand">Digital Aura <span>SEO Autopilot Panel</span></div>
+    <div class="brand">
+      <div class="logo-dot"></div>
+      <div class="brand-text">Digital Aura <span>SEO Autopilot Panel</span></div>
+    </div>
     <button onclick="logout()">Logout</button>
   </header>
   <main>
 
+    <div class="stat-row" id="stat-row"></div>
+
     <div class="card">
-      <h2>✅ Pending Approvals</h2>
+      <div class="card-head"><h2>🤖 Agents</h2></div>
+      <div id="agents-grid"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>✅ Pending Approvals</h2></div>
       <div id="pending-list"><div class="empty">Loading…</div></div>
     </div>
 
     <div class="card">
-      <h2>➕ Create New Blog Topic</h2>
+      <div class="card-head"><h2>➕ Create New Blog Topic</h2></div>
       <select id="site-select"></select>
       <input id="topic-input" type="text" placeholder="Topic (e.g. 'Local SEO Checklist for Hotels')" />
       <textarea id="original-element-input" placeholder="Real result/fact to base this on (e.g. 'We took a hotel client from page 5 to #1 for jacuzzi suites near me in 3 months, 15,000 extra sessions, 160 monthly bookings')"></textarea>
-      <button class="primary" id="create-topic-btn" onclick="createTopic()">Create Draft Task</button>
+      <button class="primary" id="create-topic-btn" onclick="createTopic()" style="width:auto;padding:11px 22px;">Create Draft Task</button>
       <div id="create-status" class="status-msg"></div>
     </div>
 
     <div class="card">
-      <h2>🕒 Recent Activity</h2>
+      <div class="card-head"><h2>🕒 Recent Activity</h2></div>
       <div id="recent-list"><div class="empty">Loading…</div></div>
     </div>
 
@@ -115,7 +173,6 @@ const SUPABASE_URL = 'https://wrmgdcmyirnybybqlqll.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybWdkY215aXJueWJ5YnFscWxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxMTM1MzcsImV4cCI6MjA5OTY4OTUzN30.wx8ukJ9C_W6LhuLwsfhVlPnluCFVwP7SnTyenlySSBY';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-window.supabase = supabase;
 
 window.doLogin = async function () {
   const email = document.getElementById('email-input').value.trim();
@@ -158,9 +215,61 @@ async function callPanelApi(body) {
 
 async function loadData() {
   const data = await callPanelApi({ action: 'list' });
+  renderStats(data);
+  renderAgents(data.agents || []);
   renderPending(data.pending || []);
   renderRecent(data.recent || []);
   renderSites(data.sites || []);
+}
+
+function renderStats(data) {
+  const recent = data.recent || [];
+  const rejected = recent.filter(t => t.status === 'rejected' || t.status === 'failed').length;
+  const completed = recent.filter(t => t.status === 'completed').length;
+  const liveAgents = (data.agents || []).filter(a => timeAgoStatus(a.lastRun) === 'live').length;
+  const el = document.getElementById('stat-row');
+  el.innerHTML = [
+    { num: (data.pending || []).length, label: 'Awaiting Approval', cls: 'accent-orange' },
+    { num: completed, label: 'Completed (recent)', cls: 'accent-green' },
+    { num: rejected, label: 'Rejected (recent)', cls: 'accent-red' },
+    { num: `${liveAgents}/${(data.agents || []).length}`, label: 'Agents Active', cls: '' },
+  ].map(s => `<div class="stat-card ${s.cls}"><div class="stat-num">${s.num}</div><div class="stat-label">${s.label}</div></div>`).join('');
+}
+
+function timeAgoStatus(iso) {
+  if (!iso) return 'none';
+  const mins = (Date.now() - new Date(iso).getTime()) / 60000;
+  return mins < 180 ? 'live' : 'stale';
+}
+
+function timeAgoText(iso) {
+  if (!iso) return 'never run yet';
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
+function renderAgents(agents) {
+  const el = document.getElementById('agents-grid');
+  if (!agents.length) { el.innerHTML = '<div class="empty">No agent data yet.</div>'; return; }
+  el.innerHTML = `<div class="agent-grid">` + agents.map(a => {
+    const status = timeAgoStatus(a.lastRun);
+    return `
+      <div class="agent-card">
+        <div class="agent-card-top">
+          <span class="agent-name">${escapeHtml(a.name)}</span>
+          <span class="status-dot ${status}" title="${status}"></span>
+        </div>
+        <div class="agent-desc">${escapeHtml(a.description)}</div>
+        <div class="agent-meta-row">
+          <span>${escapeHtml(a.schedule)}</span>
+          <span>${timeAgoText(a.lastRun)}</span>
+        </div>
+      </div>`;
+  }).join('') + `</div>`;
 }
 
 function renderPending(items) {
@@ -244,7 +353,6 @@ function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Resume an existing session on page load
 supabase.auth.getSession().then(({ data }) => {
   if (data.session) showApp();
 });

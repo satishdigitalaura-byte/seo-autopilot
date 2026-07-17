@@ -37,12 +37,30 @@ Deno.serve(async (req) => {
   const action = body.action as string;
 
   if (action === 'list') {
-    const [{ data: pending }, { data: recent }, { data: sites }] = await Promise.all([
+    const [{ data: pending }, { data: recent }, { data: sites }, { data: results }] = await Promise.all([
       supabase.from('agent_tasks').select('*, sites(domain)').eq('task_type', 'approve_draft').eq('status', 'awaiting_approval').order('created_at', { ascending: false }),
       supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').order('created_at', { ascending: false }).limit(30),
       supabase.from('sites').select('id, domain, name').order('domain'),
+      supabase.from('agent_results').select('agent_name, created_at').order('created_at', { ascending: false }).limit(200),
     ]);
-    return json({ pending: pending || [], recent: recent || [], sites: sites || [] });
+
+    // Known agents this system runs, with static metadata (schedule/description
+    // don't live in the DB) merged with the most recent real activity timestamp
+    // per agent, so the panel shows whether each one is actually alive.
+    const AGENTS = [
+      { id: 'content_draft_agent', name: 'Content Draft Agent', description: 'Writes SEO-optimized blog drafts from real client results, following the full on-page checklist.', schedule: 'Every 15 minutes' },
+      { id: 'policy_guardrail_agent', name: 'Policy Guardrail Agent', description: 'Reviews every draft before it reaches a human — rejects spam/policy violations, sends Slack + email for approval.', schedule: 'Every 10 minutes' },
+      { id: 'seo_audit_agent', name: 'SEO Audit Agent', description: 'Weekly deep audit: striking-distance keywords, low-CTR pages, query movement, content gaps.', schedule: 'Weekly (Monday)' },
+      { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Daily' },
+      { id: 'content_refresh_agent', name: 'Content Refresh Agent', description: 'Refreshes underperforming content flagged by the Watcher.', schedule: 'Not built yet' },
+    ];
+    const lastRunByAgent: Record<string, string> = {};
+    for (const r of results || []) {
+      if (!lastRunByAgent[r.agent_name]) lastRunByAgent[r.agent_name] = r.created_at;
+    }
+    const agents = AGENTS.map((a) => ({ ...a, lastRun: lastRunByAgent[a.id] || null }));
+
+    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents });
   }
 
   if (action === 'approve' || action === 'reject') {
