@@ -133,6 +133,12 @@ ${linkList}
 27. ENGAGEMENT ELEMENTS: use a comparison table, numbered steps, or definition callout somewhere if the topic genuinely supports it (skip if it would feel forced).
 28. TECHNICAL HYGIENE: only real internal links, only real/well-known external links, clean semantic HTML, no broken markup, no placeholder text left in.
 29. NO BACKLINK/LINK-BUILDING CLAIMS: this agency does NOT offer backlink building / link building / off-page link acquisition as a service. Never mention "backlinks", "link building", or claim/imply that service anywhere in the title, keywords, FAQs, or body — not even as a generic SEO-tips mention. If it would naturally come up, skip it or replace it with an on-page/technical/local SEO point instead.
+30. VISUAL DESIGN HOOKS — MANDATORY WRAPPER CLASSES: right now the site renders your HTML with no visual treatment at all (looks like a plain copy-pasted document), so use these exact wrapper elements/classes wherever they genuinely fit — the site's CSS targets these classes to render them as styled boxes:
+    - Wrap the single biggest stat/result from the ORIGINAL ELEMENT (e.g. "15,000 additional sessions") in <div class="da-stat-callout">...</div> — one per article, placed early, ideally right after the intro.
+    - Wrap a 2-4 bullet "key takeaway" summary in <div class="da-key-takeaway"><strong>Key takeaway:</strong><ul>...</ul></div> — place after the first or second H2.
+    - Wrap any direct claim/result quote in <blockquote class="da-pullquote">...</blockquote> instead of a plain <p>.
+    - Wrap the final CTA paragraph in <div class="da-cta-box">...</div> instead of a bare <p>.
+    - Never use inline style="" or <font> — only these class names, so the site's own CSS controls the actual look.
 
 TOPIC: ${topic}
 ORIGINAL ELEMENT (the backbone of the article): ${p.originalElement}
