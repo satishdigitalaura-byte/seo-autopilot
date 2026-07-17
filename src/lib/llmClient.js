@@ -19,9 +19,11 @@ const DEFAULT_MODEL = process.env.LLM_MODEL || 'gemini-flash-lite-latest';
  * @param {string} opts.prompt        - the full prompt text
  * @param {number} [opts.maxTokens=500]
  * @param {number} [opts.temperature=0.4]
+ * @param {string} [opts.model] - override DEFAULT_MODEL for this one call (e.g. a
+ *   heavier model for long-form content the lite model can't sustain)
  * @returns {Promise<string>} the model's text response
  */
-export async function generateText({ prompt, maxTokens = 500, temperature = 0.4 }) {
+export async function generateText({ prompt, maxTokens = 500, temperature = 0.4, model }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
     throw new Error(
@@ -29,7 +31,7 @@ export async function generateText({ prompt, maxTokens = 500, temperature = 0.4 
     );
   }
 
-  const res = await fetch(`${GEMINI_ENDPOINT}/${DEFAULT_MODEL}:generateContent?key=${key}`, {
+  const res = await fetch(`${GEMINI_ENDPOINT}/${model || DEFAULT_MODEL}:generateContent?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

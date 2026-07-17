@@ -53,6 +53,20 @@ function checkKeywordStuffing(text, targetKeyword) {
   };
 }
 
+function checkContentLength(payload) {
+  const wordMin = Number(payload.wordMin || 0);
+  if (!wordMin) {
+    return { id: 'content_length', passed: true, severity: 'reject', detail: 'No wordMin supplied — skipped' };
+  }
+  const wordCount = stripHtml(payload.content || '').split(/\s+/).filter(Boolean).length;
+  return {
+    id: 'content_length',
+    passed: wordCount >= wordMin,
+    severity: 'reject',
+    detail: wordCount >= wordMin ? null : `Only ${wordCount} words, needs at least ${wordMin} for this topic's competitiveness`,
+  };
+}
+
 function checkOriginalElement(payload) {
   const hasOriginal = typeof payload.originalElement === 'string' && payload.originalElement.trim().length > 0;
   return {
@@ -125,6 +139,7 @@ export function runRuleChecks(payload, site) {
   const checks = [
     checkHiddenText(content),
     checkKeywordStuffing(content, payload.targetKeyword),
+    checkContentLength(payload),
     checkOriginalElement(payload),
     checkScaledAbuse(payload),
     checkSneakyRedirect(payload, site),

@@ -80,7 +80,9 @@ export async function processContentDraftTask(task) {
     || internalLinkCandidates[0];
 
   const currentYear = new Date().getFullYear();
-  const wordTarget = /best|vs|comparison|guide|checklist|complete/i.test(topic) ? '1800-2800 (competitive/pillar topic)' : '1000-1600 (standard topic)';
+  const isCompetitiveTopic = /best|vs|comparison|guide|checklist|complete/i.test(topic);
+  const wordMin = isCompetitiveTopic ? 1800 : 1000;
+  const wordTarget = isCompetitiveTopic ? `${wordMin}-2800 (competitive/pillar topic)` : `${wordMin}-1600 (standard topic)`;
 
   const prompt = `You are an expert SEO content writer and conversion copywriter for ${site?.name || 'the client'}, writing content that must genuinely help a human reader first — not content written primarily to please a search algorithm. Follow Google's ACTUAL published guidance, not mythbusted "AEO/GEO" tactics. You also follow a strict on-page SEO checklist (below) on every single draft, because that checklist is what gets this content actually ranking, not just published.
 
@@ -114,7 +116,7 @@ ${keywordResearch.realQueriesUsed?.length ? `Real queries already bringing visit
    - Any sentence whose only job is to announce the topic generically before saying anything real.
    Instead, open with the ORIGINAL ELEMENT itself, a specific number/result, or a direct claim that could only be written by someone who actually did the work. Example of the difference: BAD — "In 2026, the landscape of SEO has shifted." GOOD — "We took a hotel client's booking page from page 5 to the #1 spot for 'jacuzzi suites near me' in 90 days — here's the exact on-page framework we used." The primary keyword must still appear naturally within the first ~100 words, and the intro must directly address search intent.
 13. KEYWORD DENSITY: natural, not stuffed — roughly primary keyword 5-8x per 1000 words, secondary 2-4x each, long-tail 1-2x, NLP terms sprinkled as topically relevant. Never force a count at the cost of readability.
-14. CONTENT LENGTH: target ${wordTarget} — driven by what the topic actually needs, not padding to hit a number.
+14. CONTENT LENGTH — HARD MINIMUM, NOT A SUGGESTION: this piece must be AT LEAST ${wordMin} words of real body copy (target range ${wordTarget}). Word count is checked programmatically after you write — a draft under ${wordMin} words gets bounced back for revision, so do not stop early or wrap up after a couple of short sections. Cover every H2 subtopic in real depth (concrete detail, examples, specifics tied to the ORIGINAL ELEMENT) rather than staying surface-level — depth is what naturally reaches this length, not padding.
 15. IMAGES: do NOT invent, hallucinate, or fabricate image files/URLs — no real image pipeline exists yet. Instead, output an "imagePlacements" array (see JSON schema) naming where images SHOULD go and their ideal SEO filename + alt text, for a human to add later. Do not put fake <img> tags in the HTML.
 16. INTERNAL LINKS: naturally weave in 3-8 links if enough real candidates exist (use as many of the real list below as make sense — never fewer than what naturally fits, never invent a URL):
 ${linkList}
@@ -155,7 +157,15 @@ Return ONLY a JSON object, no other text:
   "contentHtml": "<h1>...</h1><p>...</p> the full article as clean semantic HTML per every checklist rule above, including the internal links, external links (if any), FAQ section, and CTA — do NOT include <img> tags (see rule 15)"
 }`;
 
-  const raw = await generateText({ prompt, maxTokens: 4500, temperature: 0.6 });
+  // Token budget must comfortably fit the full HTML article (up to 2800 words ≈ 3800 tokens)
+  // plus JSON overhead (title/meta/faqs/imagePlacements) — 4500 was silently truncating
+  // competitive/pillar topics well short of the required word minimum. The default "lite"
+  // model also can't sustain 1800+ words regardless of token budget, so competitive/pillar
+  // topics get bumped to the full gemini-2.5-flash model — everything else stays on the
+  // free lite model to keep this near-$0.
+  const maxTokens = isCompetitiveTopic ? 14000 : 6000;
+  const model = isCompetitiveTopic ? 'gemini-flash-latest' : undefined;
+  const raw = await generateText({ prompt, maxTokens, temperature: 0.6, model });
 
   let draft;
   try {
@@ -254,6 +264,7 @@ Return ONLY a JSON object, no other text:
       needsTableOfContents: !!draft.needsTableOfContents,
       imagePlacements: draft.imagePlacements || [],
       schemaJsonLd,
+      wordMin,
     },
   });
 
