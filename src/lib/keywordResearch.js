@@ -30,6 +30,8 @@ export async function researchKeywords(site, topic) {
 
   const prompt = `You are doing keyword research for an SEO content brief. You are NOT allowed to invent search volume or difficulty numbers — you don't have that data. Your only job is to organize the REAL data given below and suggest natural keyword phrasing a human would actually type.
 
+IMPORTANT: This agency does NOT offer backlink building / link building / off-page link acquisition as a service. Never suggest "backlinks", "link building", "backlink profile", or similar off-page-link terms as keywords, and do not treat them as a topic to write about.
+
 TOPIC: ${topic}
 
 REAL search queries that already bring visitors to this site, related to this topic (from Google Search Console — genuine data, may be empty for a brand-new topic):

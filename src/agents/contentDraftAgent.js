@@ -124,6 +124,7 @@ ${linkList}
 26. AI OVERVIEW / AI-ASSISTANT FRIENDLY (AIO/GEO): use direct, extractable answers where natural, comparison/definition-style clarity, and let at least one section be structured as a list or short table if the content genuinely suits it — but do NOT force a rigid "answer in the first 40 words" formula; let structure serve the reader.
 27. ENGAGEMENT ELEMENTS: use a comparison table, numbered steps, or definition callout somewhere if the topic genuinely supports it (skip if it would feel forced).
 28. TECHNICAL HYGIENE: only real internal links, only real/well-known external links, clean semantic HTML, no broken markup, no placeholder text left in.
+29. NO BACKLINK/LINK-BUILDING CLAIMS: this agency does NOT offer backlink building / link building / off-page link acquisition as a service. Never mention "backlinks", "link building", or claim/imply that service anywhere in the title, keywords, FAQs, or body — not even as a generic SEO-tips mention. If it would naturally come up, skip it or replace it with an on-page/technical/local SEO point instead.
 
 TOPIC: ${topic}
 ORIGINAL ELEMENT (the backbone of the article): ${p.originalElement}
