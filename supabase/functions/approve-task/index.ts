@@ -12,6 +12,7 @@
 // keeps the "one Approve tap" promise from the master architecture doc while
 // preserving a second, cheap safety check.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { resolveDraftTask } from '../_shared/resolveDraft.ts';
 
 function htmlResponse(message: string) {
   return new Response(
@@ -40,67 +41,6 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  const { data: task, error } = await supabase.from('agent_tasks').select('*').eq('id', taskId).single();
-  if (error || !task) {
-    return htmlResponse('Task not found — it may have already been processed.');
-  }
-  if (task.status !== 'awaiting_approval') {
-    return htmlResponse(`Already handled earlier (status: ${task.status}). No action taken.`);
-  }
-
-  if (action === 'reject') {
-    await supabase.from('agent_tasks').update({
-      status: 'rejected',
-      approved_by: 'Slack (rejected)',
-      completed_at: new Date().toISOString(),
-    }).eq('id', taskId);
-    return htmlResponse('❌ Rejected. This draft will not be published.');
-  }
-
-  await supabase.from('agent_tasks').update({
-    status: 'approved',
-    approved_by_human: true,
-    approved_by: 'Slack',
-    approved_at: new Date().toISOString(),
-  }).eq('id', taskId);
-
-  const { data: site } = await supabase.from('sites').select('*').eq('id', task.site_id).single();
-  const { data: cred } = await supabase
-    .from('site_credentials')
-    .select('credential_value')
-    .eq('site_id', task.site_id)
-    .eq('credential_key', 'seo_agent_shared_secret')
-    .single();
-
-  let publishNote = '';
-  try {
-    const res = await fetch(`${site.api_base_url}/publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Seo-Agent-Secret': cred?.credential_value || '' },
-      body: JSON.stringify({
-        approvedByHuman: true,
-        cmsStatus: 'draft',
-        slug: task.payload.slug,
-        title: task.payload.title,
-        content: task.payload.content,
-        excerpt: task.payload.excerpt,
-        metaTitle: task.payload.metaTitle,
-        metaDescription: task.payload.metaDescription,
-        keywords: task.payload.keywords,
-      }),
-    });
-    const json = await res.json();
-    publishNote = res.ok
-      ? `Saved to ${site.domain} as a draft. Log in to the admin panel for a final check before publishing live.`
-      : `Approved, but the site publish call failed: ${json.error || res.status}. Contact the developer.`;
-  } catch (e) {
-    publishNote = `Approved, but could not reach the site to save the draft: ${(e as Error).message}`;
-  }
-
-  await supabase.from('agent_tasks').update({
-    status: 'completed',
-    completed_at: new Date().toISOString(),
-  }).eq('id', taskId);
-
-  return htmlResponse(`✅ Approved! ${publishNote}`);
+  const result = await resolveDraftTask(supabase, taskId, action as 'approve' | 'reject', 'Slack');
+  return htmlResponse(`${result.ok ? '✅' : '⚠️'} ${result.message}`);
 });

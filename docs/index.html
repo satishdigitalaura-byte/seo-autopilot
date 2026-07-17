@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SEO Autopilot — Panel</title>
+<style>
+  :root {
+    --dark: #0A1628; --blue: #1A6FE8; --orange: #FF6B2B;
+    --green: #22C55E; --red: #EF4444; --gray: #6B7280;
+    --bg: #F8FAFF; --border: #E5E7EB;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: #1F2937;
+  }
+  header {
+    background: var(--dark); color: #fff; padding: 18px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header .brand { font-size: 18px; font-weight: 700; }
+  header .brand span { color: var(--gray); font-size: 13px; font-weight: 400; margin-left: 8px; }
+  header button {
+    background: transparent; border: 1px solid #374151; color: #fff;
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
+  .card {
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 20px;
+  }
+  h2 { font-size: 16px; color: var(--dark); margin: 0 0 16px; }
+  .login-box {
+    max-width: 380px; margin: 80px auto; text-align: center;
+  }
+  .login-box h1 { font-size: 20px; color: var(--dark); }
+  input, select, textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; margin-bottom: 12px; font-family: inherit;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  button.primary {
+    background: var(--blue); color: #fff; border: none; padding: 10px 18px;
+    border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.approve { background: var(--green); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-right: 8px; }
+  button.reject { background: var(--red); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  .draft-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
+  .draft-item:last-child { border-bottom: none; }
+  .draft-title { font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+  .draft-meta { font-size: 12px; color: var(--gray); margin-bottom: 8px; }
+  .draft-excerpt { font-size: 14px; color: #374151; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px; color: var(--gray); border-bottom: 1px solid var(--border); font-weight: 600; }
+  td { padding: 8px; border-bottom: 1px solid var(--border); }
+  .badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge.awaiting_approval, .badge.pending { background: #FEF3C7; color: #92400E; }
+  .badge.completed, .badge.approved { background: #DCFCE7; color: #166534; }
+  .badge.rejected, .badge.failed { background: #FEE2E2; color: #991B1B; }
+  .badge.in_progress { background: #DBEAFE; color: #1E40AF; }
+  .empty { color: var(--gray); font-size: 14px; padding: 12px 0; }
+  .status-msg { font-size: 13px; margin-top: 10px; }
+  .status-msg.error { color: var(--red); }
+  .status-msg.ok { color: var(--green); }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="login-box">
+  <h1>SEO Autopilot Panel</h1>
+  <p style="color:var(--gray);font-size:14px;">Login with your email — no password needed.</p>
+  <div id="step-email">
+    <input id="email-input" type="email" placeholder="you@digitalaura.com" />
+    <button class="primary" id="send-code-btn" onclick="sendCode()">Send Login Code</button>
+  </div>
+  <div id="step-otp" style="display:none;">
+    <p style="font-size:13px;color:var(--gray);">Enter the 6-digit code sent to your email.</p>
+    <input id="otp-input" type="text" placeholder="123456" maxlength="6" />
+    <button class="primary" id="verify-code-btn" onclick="verifyCode()">Login</button>
+  </div>
+  <div id="login-status" class="status-msg"></div>
+</div>
+
+<div id="app-screen" style="display:none;">
+  <header>
+    <div class="brand">Digital Aura <span>SEO Autopilot Panel</span></div>
+    <button onclick="logout()">Logout</button>
+  </header>
+  <main>
+
+    <div class="card">
+      <h2>✅ Pending Approvals</h2>
+      <div id="pending-list"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="card">
+      <h2>➕ Create New Blog Topic</h2>
+      <select id="site-select"></select>
+      <input id="topic-input" type="text" placeholder="Topic (e.g. 'Local SEO Checklist for Hotels')" />
+      <textarea id="original-element-input" placeholder="Real result/fact to base this on (e.g. 'We took a hotel client from page 5 to #1 for jacuzzi suites near me in 3 months, 15,000 extra sessions, 160 monthly bookings')"></textarea>
+      <button class="primary" id="create-topic-btn" onclick="createTopic()">Create Draft Task</button>
+      <div id="create-status" class="status-msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>🕒 Recent Activity</h2>
+      <div id="recent-list"><div class="empty">Loading…</div></div>
+    </div>
+
+  </main>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const SUPABASE_URL = 'https://wrmgdcmyirnybybqlqll.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybWdkY215aXJueWJ5YnFscWxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxMTM1MzcsImV4cCI6MjA5OTY4OTUzN30.wx8ukJ9C_W6LhuLwsfhVlPnluCFVwP7SnTyenlySSBY';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.supabase = supabase;
+
+let currentEmail = '';
+
+window.sendCode = async function () {
+  const email = document.getElementById('email-input').value.trim();
+  if (!email) return;
+  currentEmail = email;
+  setLoginStatus('Sending code…', '');
+  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+  if (error) {
+    setLoginStatus(error.message, 'error');
+    return;
+  }
+  document.getElementById('step-email').style.display = 'none';
+  document.getElementById('step-otp').style.display = 'block';
+  setLoginStatus('Code sent — check your email.', 'ok');
+};
+
+window.verifyCode = async function () {
+  const token = document.getElementById('otp-input').value.trim();
+  if (!token) return;
+  setLoginStatus('Verifying…', '');
+  const { error } = await supabase.auth.verifyOtp({ email: currentEmail, token, type: 'email' });
+  if (error) {
+    setLoginStatus(error.message, 'error');
+    return;
+  }
+  showApp();
+};
+
+window.logout = async function () {
+  await supabase.auth.signOut();
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'block';
+  document.getElementById('step-email').style.display = 'block';
+  document.getElementById('step-otp').style.display = 'none';
+  document.getElementById('email-input').value = '';
+  document.getElementById('otp-input').value = '';
+};
+
+function setLoginStatus(msg, cls) {
+  const el = document.getElementById('login-status');
+  el.textContent = msg;
+  el.className = 'status-msg' + (cls ? ' ' + cls : '');
+}
+
+async function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  await loadData();
+}
+
+async function callPanelApi(body) {
+  const { data, error } = await supabase.functions.invoke('panel-api', { body });
+  if (error) throw error;
+  return data;
+}
+
+async function loadData() {
+  const data = await callPanelApi({ action: 'list' });
+  renderPending(data.pending || []);
+  renderRecent(data.recent || []);
+  renderSites(data.sites || []);
+}
+
+function renderPending(items) {
+  const el = document.getElementById('pending-list');
+  if (!items.length) { el.innerHTML = '<div class="empty">No drafts waiting for approval right now.</div>'; return; }
+  el.innerHTML = items.map(t => `
+    <div class="draft-item">
+      <div class="draft-title">${escapeHtml(t.payload?.title || '(no title)')}</div>
+      <div class="draft-meta">${escapeHtml(t.sites?.domain || '')} · ${new Date(t.created_at).toLocaleString()}</div>
+      <div class="draft-excerpt">${escapeHtml(t.payload?.excerpt || '')}</div>
+      <button class="approve" onclick="handleApprove('${t.id}')">✅ Approve &amp; Publish as Draft</button>
+      <button class="reject" onclick="handleReject('${t.id}')">❌ Reject</button>
+      <div id="status-${t.id}" class="status-msg"></div>
+    </div>
+  `).join('');
+}
+
+function renderRecent(items) {
+  const el = document.getElementById('recent-list');
+  if (!items.length) { el.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+  el.innerHTML = `<table><thead><tr><th>Type</th><th>Site</th><th>Status</th><th>When</th></tr></thead><tbody>` +
+    items.map(t => `
+      <tr>
+        <td>${escapeHtml(t.task_type)}</td>
+        <td>${escapeHtml(t.sites?.domain || '—')}</td>
+        <td><span class="badge ${t.status}">${escapeHtml(t.status)}</span></td>
+        <td>${new Date(t.created_at).toLocaleString()}</td>
+      </tr>
+    `).join('') + `</tbody></table>`;
+}
+
+function renderSites(sites) {
+  const el = document.getElementById('site-select');
+  el.innerHTML = sites.map(s => `<option value="${s.id}">${escapeHtml(s.domain)}</option>`).join('');
+}
+
+window.handleApprove = (id) => handleAction(id, 'approve');
+window.handleReject = (id) => handleAction(id, 'reject');
+
+async function handleAction(taskId, action) {
+  const statusEl = document.getElementById('status-' + taskId);
+  statusEl.textContent = 'Working…';
+  statusEl.className = 'status-msg';
+  try {
+    const data = await callPanelApi({ action, taskId });
+    statusEl.textContent = data.message;
+    statusEl.className = 'status-msg ' + (data.ok ? 'ok' : 'error');
+    if (data.ok) setTimeout(loadData, 1200);
+  } catch (e) {
+    statusEl.textContent = e.message;
+    statusEl.className = 'status-msg error';
+  }
+}
+
+window.createTopic = async function () {
+  const siteId = document.getElementById('site-select').value;
+  const topic = document.getElementById('topic-input').value.trim();
+  const originalElement = document.getElementById('original-element-input').value.trim();
+  const statusEl = document.getElementById('create-status');
+  if (!siteId || !topic || !originalElement) {
+    statusEl.textContent = 'Please fill in the site, topic, and a real result/fact to write from.';
+    statusEl.className = 'status-msg error';
+    return;
+  }
+  statusEl.textContent = 'Creating…';
+  statusEl.className = 'status-msg';
+  try {
+    await callPanelApi({ action: 'create_topic', siteId, topic, originalElement });
+    statusEl.textContent = 'Task created — the agent will draft it on its next run.';
+    statusEl.className = 'status-msg ok';
+    document.getElementById('topic-input').value = '';
+    document.getElementById('original-element-input').value = '';
+    setTimeout(loadData, 1000);
+  } catch (e) {
+    statusEl.textContent = e.message;
+    statusEl.className = 'status-msg error';
+  }
+};
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Resume an existing session on page load
+supabase.auth.getSession().then(({ data }) => {
+  if (data.session) showApp();
+});
+</script>
+</body>
+</html>
