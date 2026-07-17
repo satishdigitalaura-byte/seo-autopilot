@@ -38,8 +38,11 @@ ${realQueries.length ? realQueries.slice(0, 20).map((q) => `- "${q.query}" (${q.
 Based on the topic and the real data above (if any), return ONLY a JSON object:
 {
   "primaryKeyword": "the single best target phrase — prefer a real query above if one fits, otherwise the most natural phrasing of the topic",
-  "secondaryKeywords": ["3-5 natural variations/related phrases a person would actually search"],
+  "secondaryKeywords": ["5-15 natural variations/related phrases a person would actually search"],
+  "longTailKeywords": ["4-6 longer, more specific phrases (4+ words) a person close to converting would type — prefer real longer queries from the data above if any fit"],
+  "nlpSemanticKeywords": ["8-15 topic-relevant terms/entities Google's NLP would expect near this topic (industry terms, tools, concepts) — NOT synonyms of the primary keyword, genuinely related vocabulary a subject-matter expert would naturally use"],
   "searchIntent": "one of: informational | commercial-investigation | transactional | navigational",
+  "whatUserActuallyWants": "1 sentence — what is the searcher trying to accomplish (compare options, see pricing, get proof, etc.) so the content answers the real need, not a tangent",
   "funnelStage": "one of: TOFU | MOFU | BOFU",
   "reasoning": "one sentence on why, referencing the real query data if it was used"
 }`;
@@ -53,7 +56,10 @@ Based on the topic and the real data above (if any), return ONLY a JSON object:
     parsed = {
       primaryKeyword: topic,
       secondaryKeywords: [],
+      longTailKeywords: [],
+      nlpSemanticKeywords: [],
       searchIntent: 'informational',
+      whatUserActuallyWants: '',
       funnelStage: 'TOFU',
       reasoning: 'Model response could not be parsed — falling back to the raw topic as primary keyword.',
     };

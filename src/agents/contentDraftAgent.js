@@ -79,26 +79,51 @@ export async function processContentDraftTask(task) {
   const ctaLink = internalLinkCandidates.find((l) => /contact|get in touch|growth plan/i.test(l.anchorText))
     || internalLinkCandidates[0];
 
-  const prompt = `You are an expert SEO content writer and conversion copywriter for ${site?.name || 'the client'}, writing content that must genuinely help a human reader first — not content written primarily to please a search algorithm. Follow Google's ACTUAL published guidance, not mythbusted "AEO/GEO" tactics.
+  const currentYear = new Date().getFullYear();
+  const wordTarget = /best|vs|comparison|guide|checklist|complete/i.test(topic) ? '1800-2800 (competitive/pillar topic)' : '1000-1600 (standard topic)';
+
+  const prompt = `You are an expert SEO content writer and conversion copywriter for ${site?.name || 'the client'}, writing content that must genuinely help a human reader first — not content written primarily to please a search algorithm. Follow Google's ACTUAL published guidance, not mythbusted "AEO/GEO" tactics. You also follow a strict on-page SEO checklist (below) on every single draft, because that checklist is what gets this content actually ranking, not just published.
 
 ═══ KEYWORD RESEARCH (already done — use this, don't invent your own) ═══
 Primary keyword: ${keywordResearch.primaryKeyword}
-Secondary keywords: ${(keywordResearch.secondaryKeywords || []).join(', ') || 'none'}
+Secondary keywords (use several naturally): ${(keywordResearch.secondaryKeywords || []).join(', ') || 'none'}
+Long-tail keywords (weave 1-2 into subheadings or FAQ): ${(keywordResearch.longTailKeywords || []).join(', ') || 'none'}
+NLP/semantic terms (sprinkle naturally where topically relevant — this is what tells Google/AI engines you actually understand the topic, not just the keyword): ${(keywordResearch.nlpSemanticKeywords || []).join(', ') || 'none'}
 Search intent: ${keywordResearch.searchIntent} | Funnel stage: ${keywordResearch.funnelStage}
+What the searcher actually wants: ${keywordResearch.whatUserActuallyWants || 'n/a'}
 Research note: ${keywordResearch.reasoning}
 ${keywordResearch.realQueriesUsed?.length ? `Real queries already bringing visitors near this topic:\n${keywordResearch.realQueriesUsed.slice(0, 8).map((q) => `- "${q.query}"`).join('\n')}` : ''}
 
-═══ HARD RULES (non-negotiable) ═══
-1. USER-FIRST: write for a human trying to solve a real problem. If a sentence exists only to please a search engine (keyword-stuffed, generic), cut it.
-2. NON-COMMODITY / UNIQUE POV: build the entire piece around the ORIGINAL ELEMENT below — this must be the backbone, not a quote bolted onto generic advice. Google's own example of the difference: "7 Tips for First-Time Homebuyers" = low-value commodity content; "Why We Waived the Inspection & Saved Money" = high-value non-commodity content. Aim for the second kind.
-3. NO FILLER: never open with "In today's digital landscape..." or similar padding. The first sentence must be substantive.
-4. E-E-A-T: write from firsthand agency experience, reference the original data point concretely, keep the tone confident and specific (not generic corporate voice).
-5. NATURAL KEYWORDS ONLY: use the primary/secondary keywords above where they read naturally. No stuffing, no unnatural repetition.
-6. STRUCTURE FOR HUMANS: clear H2/H3 headings, short paragraphs, scannable — but do NOT force a rigid "direct answer in the first 40 words" format or artificial fact-density. Google's own June 2026 guidance explicitly calls that a myth; let the structure serve the reader, not a formula.
-7. BOFU / LEAD-FOCUSED CLOSE: this content exists to generate leads for a digital marketing agency. End with a clear, specific call-to-action tied to a real next step (not generic "contact us today!"). ${ctaLink ? `Link the CTA to: ${ctaLink.url} (anchor text like "${ctaLink.anchorText}" or a natural variation).` : 'No contact page available — write a strong CTA without a link.'}
-8. INTERNAL LINKS: naturally weave in 1-3 links from this real list ONLY (never invent a URL):
+═══ ON-PAGE SEO CHECKLIST (every point is mandatory) ═══
+1. SEARCH INTENT FIRST: everything in the article must serve "${keywordResearch.whatUserActuallyWants || 'what the searcher wants'}" — no tangents (e.g. don't dump company history into a comparison-intent article).
+2. PRIMARY KEYWORD: exactly one, used naturally in the H1, first 100 words, at least one H2, and the conclusion.
+3. SECONDARY KEYWORDS: work several of the list above into subheadings and body copy naturally — never force one into every paragraph.
+4. LONG-TAIL KEYWORDS: use 1-2, ideally as an H2/H3 or FAQ question — they signal deeper topical coverage.
+5. NLP/SEMANTIC TERMS: use the relevant ones naturally throughout so the piece reads like it was written by someone who actually knows the subject.
+6. TITLE TAG (metaTitle): 50-60 characters, primary keyword as close to the front as natural.
+7. META DESCRIPTION: 150-160 characters, compelling, includes the primary keyword, written as real sentence(s) a human would click on (not a keyword list).
+8. URL SLUG: short, keyword-based, no filler words like "blog-post-final". Prefer close to the primary keyword.
+9. H1: exactly one, close to the primary keyword.
+10. H2 STRUCTURE: multiple clear H2 sections that each cover one distinct subtopic — no rambling single-H2 walls of text.
+11. H3: only where an H2 section genuinely needs sub-points.
+12. INTRODUCTION: the primary keyword must appear naturally within the first ~100 words, and the intro must directly address search intent — no throat-clearing.
+13. KEYWORD DENSITY: natural, not stuffed — roughly primary keyword 5-8x per 1000 words, secondary 2-4x each, long-tail 1-2x, NLP terms sprinkled as topically relevant. Never force a count at the cost of readability.
+14. CONTENT LENGTH: target ${wordTarget} — driven by what the topic actually needs, not padding to hit a number.
+15. IMAGES: do NOT invent, hallucinate, or fabricate image files/URLs — no real image pipeline exists yet. Instead, output an "imagePlacements" array (see JSON schema) naming where images SHOULD go and their ideal SEO filename + alt text, for a human to add later. Do not put fake <img> tags in the HTML.
+16. INTERNAL LINKS: naturally weave in 3-8 links if enough real candidates exist (use as many of the real list below as make sense — never fewer than what naturally fits, never invent a URL):
 ${linkList}
-9. SEMANTIC HTML: use <h1> once, <h2>/<h3> for sections, <p>, <ul>/<li> where useful, real <a href="..."> for the internal links and CTA.
+17. EXTERNAL LINKS: where genuinely useful, link out 1-3 times to real, well-known authority sources (e.g. Google Search Central, Google Search Console Help, PageSpeed Insights, or another globally recognized authority actually relevant to the topic) — use real, correct URLs for well-known resources only; if unsure of the exact URL, do not include the link.
+18. FAQ SECTION: include 3-6 genuinely useful questions and concise answers relevant to this exact topic (return in the "faqs" field, and also render them as a visible FAQ section in the HTML near the end, before the CTA).
+19. SCHEMA: handled outside this prompt (BlogPosting + FAQPage + Author + Organization) — just make sure your "faqs" and "authorBio" fields are filled in accurately since they feed the schema.
+20. AUTHOR SECTION: fill "authorBio" with a short (1-2 sentence) bio establishing relevant expertise${p.authorName ? ` for ${p.authorName}${p.authorCredentials ? ` (${p.authorCredentials})` : ''}` : ' for the agency as the author (no named individual was supplied for this draft)'}.
+21. TABLE OF CONTENTS: if the article is long (roughly 1500+ words), set "needsTableOfContents": true and make sure H2s are descriptive enough to work as TOC entries.
+22. READABILITY: short paragraphs (2-4 lines), bullet/numbered lists where they aid scanning, generous white space — no dense walls of text.
+23. CTA: end with a clear, specific call-to-action tied to a real next step. ${ctaLink ? `Link it to: ${ctaLink.url} (anchor text like "${ctaLink.anchorText}" or a natural variation).` : 'No contact page available — write a strong CTA without a link.'}
+24. E-E-A-T: write from firsthand agency experience — phrases like "in our experience," "our client," "after we optimized," grounded in the ORIGINAL ELEMENT below, never generic corporate voice.
+25. FRESHNESS: where it reads naturally, signal currency (e.g. include "${currentYear}" in the title or an H2 if genuinely relevant to the topic — don't force it if awkward).
+26. AI OVERVIEW / AI-ASSISTANT FRIENDLY (AIO/GEO): use direct, extractable answers where natural, comparison/definition-style clarity, and let at least one section be structured as a list or short table if the content genuinely suits it — but do NOT force a rigid "answer in the first 40 words" formula; let structure serve the reader.
+27. ENGAGEMENT ELEMENTS: use a comparison table, numbered steps, or definition callout somewhere if the topic genuinely supports it (skip if it would feel forced).
+28. TECHNICAL HYGIENE: only real internal links, only real/well-known external links, clean semantic HTML, no broken markup, no placeholder text left in.
 
 TOPIC: ${topic}
 ORIGINAL ELEMENT (the backbone of the article): ${p.originalElement}
@@ -108,14 +133,19 @@ ${site?.is_ymyl ? `\nTHIS IS A YMYL SITE — be extra precise and cautious with 
 
 Return ONLY a JSON object, no other text:
 {
-  "title": "compelling, specific, non-commodity title",
-  "slug": "url-friendly-slug",
-  "metaTitle": "<= 60 characters",
-  "metaDescription": "<= 155 characters, written well (Bing displays it literally, doesn't rewrite it like Google sometimes does)",
-  "keywords": "comma, separated, keywords (use the researched ones above)",
+  "title": "compelling, specific, non-commodity title, primary keyword near the front",
+  "slug": "short-keyword-based-url-slug",
+  "metaTitle": "50-60 characters, primary keyword near the front",
+  "metaDescription": "150-160 characters, compelling real sentence(s), includes primary keyword",
+  "keywords": "comma, separated, primary + secondary keywords",
+  "longTailKeywordsUsed": ["the long-tail phrases you actually wove in"],
   "excerpt": "1-2 sentence summary",
   "schemaType": "BlogPosting or Article",
-  "contentHtml": "<h1>...</h1><p>...</p> the full article as clean semantic HTML, including the internal links and CTA per the rules above"
+  "authorBio": "1-2 sentence author bio for E-E-A-T",
+  "needsTableOfContents": true or false,
+  "faqs": [{ "question": "...", "answer": "..." }],
+  "imagePlacements": [{ "afterHeading": "the H2/H3 text this image should follow", "suggestedFileName": "seo-friendly-file-name.webp", "altText": "descriptive alt text with keyword where natural" }],
+  "contentHtml": "<h1>...</h1><p>...</p> the full article as clean semantic HTML per every checklist rule above, including the internal links, external links (if any), FAQ section, and CTA — do NOT include <img> tags (see rule 15)"
 }`;
 
   const raw = await generateText({ prompt, maxTokens: 4500, temperature: 0.6 });
@@ -133,14 +163,47 @@ Return ONLY a JSON object, no other text:
     return { decision: 'failed_parse', raw: raw.slice(0, 400) };
   }
 
-  const schemaJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': draft.schemaType || 'BlogPosting',
-    headline: draft.title,
-    description: draft.metaDescription,
-    datePublished: new Date().toISOString(),
-    author: { '@type': 'Organization', name: site?.name || 'Digital Aura' },
-  };
+  const authorSchema = p.authorName
+    ? { '@type': 'Person', name: p.authorName, ...(p.authorCredentials ? { jobTitle: p.authorCredentials } : {}), description: draft.authorBio }
+    : { '@type': 'Organization', name: site?.name || 'Digital Aura', description: draft.authorBio };
+
+  const schemaGraph = [
+    {
+      '@context': 'https://schema.org',
+      '@type': draft.schemaType || 'BlogPosting',
+      headline: draft.title,
+      description: draft.metaDescription,
+      datePublished: new Date().toISOString(),
+      author: authorSchema,
+      publisher: { '@type': 'Organization', name: site?.name || 'Digital Aura' },
+    },
+  ];
+
+  if (Array.isArray(draft.faqs) && draft.faqs.length) {
+    schemaGraph.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: draft.faqs.map((f) => ({
+        '@type': 'Question',
+        name: f.question,
+        acceptedAnswer: { '@type': 'Answer', text: f.answer },
+      })),
+    });
+  }
+
+  if (draft.slug && site?.domain) {
+    schemaGraph.push({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `https://${site.domain}/` },
+        { '@type': 'ListItem', position: 2, name: 'Blog', item: `https://${site.domain}/blog` },
+        { '@type': 'ListItem', position: 3, name: draft.title, item: `https://${site.domain}/blog/${draft.slug}` },
+      ],
+    });
+  }
+
+  const schemaJsonLd = schemaGraph.length === 1 ? schemaGraph[0] : schemaGraph;
 
   await supabase.from('agent_results').insert({
     task_id: task.id,
@@ -151,6 +214,7 @@ Return ONLY a JSON object, no other text:
       contentLength: (draft.contentHtml || '').length,
       keywordResearch,
       internalLinkCandidatesOffered: internalLinkCandidates.length,
+      imagePlacements: draft.imagePlacements || [],
     },
   });
 
@@ -176,7 +240,12 @@ Return ONLY a JSON object, no other text:
       metaTitle: draft.metaTitle,
       metaDescription: draft.metaDescription,
       keywords: draft.keywords,
+      longTailKeywordsUsed: draft.longTailKeywordsUsed || [],
       excerpt: draft.excerpt,
+      faqs: draft.faqs || [],
+      authorBio: draft.authorBio,
+      needsTableOfContents: !!draft.needsTableOfContents,
+      imagePlacements: draft.imagePlacements || [],
       schemaJsonLd,
     },
   });
