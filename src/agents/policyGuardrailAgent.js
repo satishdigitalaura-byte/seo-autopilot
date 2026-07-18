@@ -64,7 +64,16 @@ export async function processGuardrailTask(task) {
     qualitative = await runQualitativeCheck(task.payload);
   }
 
-  const rejected = hardFailures.length > 0 || qualitative?.uniquePov === false;
+  // The qualitative check is a subjective AI opinion, not a mechanical rule —
+  // it can keep judging successive rewrites of the same topic as "still too
+  // generic" indefinitely, bouncing the draft back and forth forever with no
+  // human ever seeing it. After a few genuine revision attempts (tracked via
+  // payload.revisionCount, set by content_draft_agent), let a human make the
+  // final call instead of looping the bot pair endlessly — the hard rule
+  // checks (the actual policy gates) still have to pass either way.
+  const revisionCount = task.payload.revisionCount || 0;
+  const qualitativeRejects = qualitative?.uniquePov === false && revisionCount < 3;
+  const rejected = hardFailures.length > 0 || qualitativeRejects;
   const resultSummary = {
     ruleChecks: checks,
     hardFailures: hardFailures.map((c) => c.id),
@@ -72,6 +81,7 @@ export async function processGuardrailTask(task) {
     forcesHumanReview,
     qualitative,
     decision: rejected ? 'rejected' : 'passed_to_human_review',
+    forcedToHumanAfterRevisions: !rejected && qualitative?.uniquePov === false,
   };
 
   await supabase.from('agent_results').insert({
@@ -114,6 +124,7 @@ export async function processGuardrailTask(task) {
         triggerReason: task.payload.triggerReason,
         authorName: task.payload.authorName,
         authorCredentials: task.payload.authorCredentials,
+        revisionCount,
       },
       status: 'pending',
     });
@@ -144,6 +155,7 @@ export async function processGuardrailTask(task) {
         <tr><td style="padding:4px 0;color:#6B7280;vertical-align:top;">Why written</td><td style="padding:4px 0;">${task.payload.triggerReason || ''}</td></tr>
       </table>
       <p style="margin-top:16px;padding:12px 16px;background:#F8FAFF;border-radius:8px;color:#374151;">${task.payload.excerpt || ''}</p>
+      ${resultSummary.forcedToHumanAfterRevisions ? `<p style="margin-top:16px;padding:12px 16px;background:#FFF7ED;border-radius:8px;color:#9A3412;"><strong>Note:</strong> the AI quality-checker rejected this draft ${revisionCount} time(s) for being too generic and still isn't fully satisfied — it's being sent to you directly instead of looping forever. Please read it a bit more carefully than usual before approving.</p>` : ''}
       <p style="margin-top:16px;font-size:13px;color:#6B7280;">This is not live yet &mdash; nothing publishes until a human approves it.</p>
       ${reviewTask ? renderApprovalButtons({ approveHref: approveUrl(reviewTask.id, 'approve'), rejectHref: approveUrl(reviewTask.id, 'reject') }) : ''}
     `;
