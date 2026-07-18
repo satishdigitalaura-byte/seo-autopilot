@@ -39,6 +39,22 @@ Reply with ONLY a JSON object, no other text: {"uniquePov": boolean, "eeatSignal
 export async function processGuardrailTask(task) {
   const supabase = getSupabaseClient();
 
+  // Defensive guard: this agent only knows how to review an actual draft
+  // (payload.content). Any other task type that ends up targeted here (e.g.
+  // a stray 'need_original_element' task) has nothing to review — running
+  // rule checks against it always hard-fails and used to trigger a
+  // 'revise_rejected_draft' bounce back to content_draft_agent, which had
+  // nothing to revise either. That created an infinite ping-pong loop
+  // between the two agents. Fail it once, terminally, instead.
+  if (!task.payload?.content) {
+    await supabase.from('agent_tasks').update({
+      status: 'failed',
+      error_message: `Not a reviewable draft (task_type: ${task.task_type}) — no content in payload.`,
+      completed_at: new Date().toISOString(),
+    }).eq('id', task.id);
+    return { decision: 'skipped_not_a_draft' };
+  }
+
   const { data: site } = await supabase.from('sites').select('*').eq('id', task.site_id).single();
 
   const { checks, hardFailures, escalations, forcesHumanReview } = runRuleChecks(task.payload, site);
@@ -79,13 +95,26 @@ export async function processGuardrailTask(task) {
       completed_at: new Date().toISOString(),
     }).eq('id', task.id);
 
-    // Bounce it back to whoever drafted it so they can revise, instead of silently dying.
+    // Bounce it back to whoever drafted it so they can revise — carrying
+    // forward the same fields content_draft_agent needs to actually redraft
+    // (topic/originalElement/etc), not just the rejection reasons. Without
+    // these, the revise task arrived empty and failed the §6 gate again,
+    // which was the other half of the ping-pong loop.
     await supabase.from('agent_tasks').insert({
       site_id: task.site_id,
       source_agent: 'policy_guardrail_agent',
       target_agent: task.source_agent,
       task_type: 'revise_rejected_draft',
-      payload: { originalTaskId: task.id, reasons: resultSummary },
+      payload: {
+        originalTaskId: task.id,
+        reasons: resultSummary,
+        topic: task.payload.targetKeyword || task.payload.topic,
+        targetKeyword: task.payload.targetKeyword,
+        originalElement: task.payload.originalElement,
+        triggerReason: task.payload.triggerReason,
+        authorName: task.payload.authorName,
+        authorCredentials: task.payload.authorCredentials,
+      },
       status: 'pending',
     });
     return resultSummary;

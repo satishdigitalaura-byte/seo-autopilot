@@ -2,6 +2,8 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { generateText } from '../lib/llmClient.js';
 import { researchKeywords } from '../lib/keywordResearch.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
+import { sendNotificationEmail } from '../lib/emailClient.js';
+import { renderEmailShell } from '../lib/emailTemplate.js';
 
 /**
  * Content Draft Agent — writes a blog/page draft with Gemini, then hands it to
@@ -34,7 +36,12 @@ export async function processContentDraftTask(task) {
   const p = task.payload || {};
   const topic = p.targetKeyword || p.topic;
 
-  // §6 hard gate — no original element, no draft.
+  // §6 hard gate — no original element, no draft. This can never be filled in
+  // automatically (it has to be a real fact/data point a human supplies), so
+  // we notify a human directly and stop — we do NOT create a follow-up agent
+  // task here. Bouncing this back into the agent pipeline (as earlier code
+  // did) created an infinite content_draft_agent <-> policy_guardrail_agent
+  // ping-pong loop, since neither agent can ever supply the missing fact.
   if (!p.originalElement || !String(p.originalElement).trim()) {
     await supabase.from('agent_tasks').update({
       status: 'failed',
@@ -42,14 +49,21 @@ export async function processContentDraftTask(task) {
       completed_at: new Date().toISOString(),
     }).eq('id', task.id);
 
-    await supabase.from('agent_tasks').insert({
-      site_id: task.site_id,
-      source_agent: 'content_draft_agent',
-      target_agent: task.source_agent,
-      task_type: 'need_original_element',
-      payload: { originalTaskId: task.id, topic },
-      status: 'pending',
-    });
+    try {
+      const { data: site } = await supabase.from('sites').select('domain').eq('id', task.site_id).single();
+      await sendNotificationEmail({
+        subject: `[Input needed] Original element missing — ${topic || 'untitled topic'} (${site?.domain || ''})`,
+        html: renderEmailShell({
+          badgeLabel: 'Input Needed',
+          badgeTone: 'warning',
+          heading: topic || 'A blog topic needs a real fact',
+          bodyHtml: `<p>This topic can't be drafted yet — it needs one genuine, original detail (a real client data point, case-study figure, or firsthand fact) before the agent can write it, per the anti-scaled-content-abuse guideline.</p><p style="margin-top:12px;color:#6B7280;">Site: ${site?.domain || 'unknown'}<br/>Task ID: ${task.id}</p>`,
+        }),
+      });
+    } catch (err) {
+      console.warn('Original-element notification email failed (non-fatal):', err.message);
+    }
+
     return { decision: 'blocked_no_original_element' };
   }
 
