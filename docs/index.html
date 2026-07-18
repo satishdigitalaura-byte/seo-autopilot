@@ -554,7 +554,7 @@ function renderAgents(agents) {
         </div>
         ${showToggle ? `
         <div class="agent-toggle-row">
-          <span class="agent-toggle-label">${a.enabled ? 'On — finding topics automatically' : 'Off — won\\'t run until turned back on'}</span>
+          <span class="agent-toggle-label">${a.enabled ? 'On — finding topics automatically' : 'Off — will not run until turned back on'}</span>
           <label class="switch">
             <input type="checkbox" ${a.enabled ? 'checked' : ''} onchange="toggleAgent('${a.id}', this.checked)">
             <span class="slider"></span>
