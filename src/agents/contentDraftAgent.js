@@ -184,27 +184,66 @@ Return ONLY a JSON object, no other text:
   // target (consistently 600-800 words across repeated runs), not just 1800+ pillar topics —
   // so every draft now uses the full gemini-flash-latest model; still free tier, still near-$0.
   const maxTokens = isCompetitiveTopic ? 16000 : 9000;
-  let raw;
-  try {
-    raw = await generateText({ prompt, maxTokens, temperature: 0.6, model: 'gemini-flash-latest' });
-  } catch (err) {
-    // gemini-flash-latest occasionally 503s under high demand — fall back to the
-    // lite model rather than blocking the whole pipeline on a transient outage.
-    console.warn('gemini-flash-latest unavailable, falling back to lite model:', err.message);
-    raw = await generateText({ prompt, maxTokens, temperature: 0.6 });
+  async function generateDraft() {
+    let text;
+    try {
+      text = await generateText({ prompt, maxTokens, temperature: 0.6, model: 'gemini-flash-latest' });
+    } catch (err) {
+      // gemini-flash-latest occasionally 503s under high demand — fall back to the
+      // lite model rather than blocking the whole pipeline on a transient outage.
+      console.warn('gemini-flash-latest unavailable, falling back to lite model:', err.message);
+      text = await generateText({ prompt, maxTokens, temperature: 0.6 });
+    }
+    const m = text.match(/\{[\s\S]*\}/);
+    return { text, parsed: JSON.parse(m ? m[0] : text) };
   }
 
-  let draft;
+  // A malformed/truncated JSON response is a real but occasional model
+  // hiccup, not evidence the topic itself is bad — one silent retry before
+  // giving up avoids failing a perfectly good topic over a one-off glitch.
+  let raw, draft;
   try {
-    const m = raw.match(/\{[\s\S]*\}/);
-    draft = JSON.parse(m ? m[0] : raw);
-  } catch {
-    await supabase.from('agent_tasks').update({
-      status: 'failed',
-      error_message: 'Model did not return valid JSON',
-      completed_at: new Date().toISOString(),
-    }).eq('id', task.id);
-    return { decision: 'failed_parse', raw: raw.slice(0, 400) };
+    ({ text: raw, parsed: draft } = await generateDraft());
+  } catch (firstErr) {
+    console.warn('Draft JSON parse failed, retrying once:', firstErr.message);
+    try {
+      ({ text: raw, parsed: draft } = await generateDraft());
+    } catch (secondErr) {
+      await supabase.from('agent_tasks').update({
+        status: 'failed',
+        error_message: 'Model did not return valid JSON, even after one retry',
+        completed_at: new Date().toISOString(),
+      }).eq('id', task.id);
+      try {
+        const { data: siteForEmail } = await supabase.from('sites').select('domain').eq('id', task.site_id).single();
+        await sendNotificationEmail({
+          subject: `[Draft failed] ${topic || 'untitled topic'} (${siteForEmail?.domain || ''})`,
+          html: renderEmailShell({
+            badgeLabel: 'Draft Failed',
+            badgeTone: 'alert',
+            heading: topic || 'A draft could not be generated',
+            bodyHtml: `<p>The AI model returned invalid output twice in a row for this topic, so this attempt was abandoned rather than retried indefinitely. Try creating the topic again from the panel — this is usually a one-off model glitch, not a problem with the topic itself.</p><p style="margin-top:12px;color:#6B7280;">Site: ${siteForEmail?.domain || 'unknown'}<br/>Task ID: ${task.id}</p>`,
+          }),
+        });
+      } catch (emailErr) {
+        console.warn('Draft-failed notification email failed (non-fatal):', emailErr.message);
+      }
+      return { decision: 'failed_parse', raw: (raw || '').slice(0, 400) };
+    }
+  }
+
+  // Fix the recurring cause of guardrail design_safe_markup rejections at the
+  // source instead of relying on the prompt alone (prompt-only instructions
+  // are unreliable — same lesson as every other hard-gate in this file): the
+  // model occasionally emits literal Markdown bold or inline style="" even
+  // though the prompt forbids both. Auto-correct both here so a good draft
+  // doesn't need a full extra draft->guardrail->revise round trip for a
+  // cosmetic formatting slip.
+  if (draft.contentHtml) {
+    draft.contentHtml = draft.contentHtml
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\s*style\s*=\s*"[^"]*"/gi, '')
+      .replace(/\s*style\s*=\s*'[^']*'/gi, '');
   }
 
   const authorSchema = p.authorName
