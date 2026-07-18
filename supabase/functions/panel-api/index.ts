@@ -19,6 +19,44 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Every panel account has a role in its own app_metadata (set only via the
+// admin API, so a user can never grant themselves a role). 'admin' can
+// approve/reject/create topics/manage users; 'viewer' can only read.
+async function getCaller(req: Request) {
+  const authHeader = req.headers.get('Authorization') || '';
+  const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data } = await userClient.auth.getUser();
+  const user = data?.user;
+  const role = (user?.app_metadata?.role as string) || 'viewer';
+  return { user, role, isAdmin: role === 'admin' };
+}
+
+// Fire GitHub Actions workflows on-demand instead of waiting for their cron,
+// so a topic created from the panel gets drafted immediately. Soft-fails
+// (silently skipped) if GITHUB_TOKEN isn't configured as a function secret —
+// the task still gets picked up by the normal 15-min cron either way.
+async function triggerWorkflow(workflowFile: string) {
+  const token = Deno.env.get('GITHUB_TOKEN');
+  const repo = Deno.env.get('GITHUB_REPO') || 'satishdigitalaura-byte/seo-autopilot';
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/dispatches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main' }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -41,7 +79,7 @@ Deno.serve(async (req) => {
       supabase.from('agent_tasks').select('*, sites(domain)').eq('task_type', 'approve_draft').eq('status', 'awaiting_approval').order('created_at', { ascending: false }),
       supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').order('created_at', { ascending: false }).limit(30),
       supabase.from('sites').select('id, domain, name').order('domain'),
-      supabase.from('agent_results').select('agent_name, created_at').order('created_at', { ascending: false }).limit(200),
+      supabase.from('agent_results').select('agent_name, created_at, result').order('created_at', { ascending: false }).limit(200),
     ]);
 
     // Known agents this system runs, with static metadata (schedule/description
@@ -49,6 +87,7 @@ Deno.serve(async (req) => {
     // per agent, so the panel shows whether each one is actually alive.
     const AGENTS = [
       { id: 'content_draft_agent', name: 'Content Draft Agent', description: 'Writes SEO-optimized blog drafts from real client results, following the full on-page checklist.', schedule: 'Every 15 minutes' },
+      { id: 'keyword_planner', name: 'Keyword Planner', description: 'Pulls real Google Ads search-volume + Search Console query data before every draft — never invented numbers.', schedule: 'Runs inside Content Draft Agent' },
       { id: 'policy_guardrail_agent', name: 'Policy Guardrail Agent', description: 'Reviews every draft before it reaches a human — rejects spam/policy violations, sends Slack + email for approval.', schedule: 'Every 10 minutes' },
       { id: 'seo_audit_agent', name: 'SEO Audit Agent', description: 'Weekly deep audit: striking-distance keywords, low-CTR pages, query movement, content gaps.', schedule: 'Weekly (Monday)' },
       { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Daily' },
@@ -57,13 +96,26 @@ Deno.serve(async (req) => {
     const lastRunByAgent: Record<string, string> = {};
     for (const r of results || []) {
       if (!lastRunByAgent[r.agent_name]) lastRunByAgent[r.agent_name] = r.created_at;
+      // keyword_planner isn't a separate DB agent — it runs inside every
+      // content_draft_agent result that actually used real ads/GSC data.
+      if (r.agent_name === 'content_draft_agent' && !lastRunByAgent['keyword_planner']) {
+        const kw = (r.result as any)?.keywordResearch;
+        if (kw && ((kw.adsKeywordIdeasUsed?.length ?? 0) > 0 || (kw.realQueriesUsed?.length ?? 0) > 0)) {
+          lastRunByAgent['keyword_planner'] = r.created_at;
+        }
+      }
     }
     const agents = AGENTS.map((a) => ({ ...a, lastRun: lastRunByAgent[a.id] || null }));
 
-    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents });
+    const { role: callerRole } = await getCaller(req);
+
+    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole });
   }
 
   if (action === 'approve' || action === 'reject') {
+    const { role, isAdmin } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'View-only accounts cannot approve or reject drafts.' }, 403);
+
     const taskId = body.taskId as string;
     if (!taskId) return json({ error: 'taskId required' }, 400);
     const authHeader = req.headers.get('Authorization') || '';
@@ -77,6 +129,9 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'create_topic') {
+    const { isAdmin } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'View-only accounts cannot create new topics.' }, 403);
+
     const { siteId, topic, originalElement, triggerReason } = body as {
       siteId?: string; topic?: string; originalElement?: string; triggerReason?: string;
     };
@@ -92,7 +147,80 @@ Deno.serve(async (req) => {
       payload: { topic, originalElement, triggerReason: triggerReason || 'panel_manual_request' },
     }).select();
     if (error) return json({ error: error.message }, 500);
-    return json({ ok: true, task: data[0] });
+
+    // Try to run it right now instead of waiting for the next cron tick.
+    const dispatched = await triggerWorkflow('content-draft.yml');
+    if (dispatched) {
+      // @ts-ignore — EdgeRuntime is available in the Supabase Edge Functions
+      // runtime; this lets the draft finish (~20-30s) before we also kick
+      // off the guardrail review, without holding the client's request open.
+      // deno-lint-ignore no-explicit-any
+      (globalThis as any).EdgeRuntime?.waitUntil((async () => {
+        await new Promise((r) => setTimeout(r, 30000));
+        await triggerWorkflow('policy-guardrail.yml');
+      })());
+    }
+
+    return json({ ok: true, task: data[0], immediate: dispatched });
+  }
+
+  // ---- User management (admin only) ----
+  if (action === 'list_users') {
+    const { data, error } = await supabase.auth.admin.listUsers();
+    if (error) return json({ error: error.message }, 500);
+    const users = data.users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      role: (u.app_metadata as any)?.role || 'viewer',
+      created_at: u.created_at,
+      last_sign_in_at: u.last_sign_in_at,
+    }));
+    return json({ users });
+  }
+
+  if (action === 'create_user') {
+    const { isAdmin } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'Only admins can add users.' }, 403);
+
+    const { email, password, role } = body as { email?: string; password?: string; role?: string };
+    if (!email || !password || password.length < 8) {
+      return json({ error: 'A valid email and a password (8+ characters) are required.' }, 400);
+    }
+    const finalRole = role === 'admin' ? 'admin' : 'viewer';
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      app_metadata: { role: finalRole },
+    });
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true, user: { id: data.user.id, email: data.user.email, role: finalRole } });
+  }
+
+  if (action === 'update_user_role') {
+    const { isAdmin, user: caller } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'Only admins can change roles.' }, 403);
+
+    const { userId, role } = body as { userId?: string; role?: string };
+    if (!userId || (role !== 'admin' && role !== 'viewer')) return json({ error: 'userId and a valid role are required.' }, 400);
+    if (userId === caller?.id && role !== 'admin') {
+      return json({ error: "You can't remove your own admin access." }, 400);
+    }
+    const { error } = await supabase.auth.admin.updateUserById(userId, { app_metadata: { role } });
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
+  }
+
+  if (action === 'delete_user') {
+    const { isAdmin, user: caller } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'Only admins can remove users.' }, 403);
+
+    const { userId } = body as { userId?: string };
+    if (!userId) return json({ error: 'userId required' }, 400);
+    if (userId === caller?.id) return json({ error: "You can't remove your own account." }, 400);
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
   }
 
   return json({ error: 'Unknown action' }, 400);

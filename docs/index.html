@@ -194,6 +194,21 @@
   .badge.completed, .badge.approved { background: #DCFCE7; color: #166534; }
   .badge.rejected, .badge.failed { background: #FEE2E2; color: #991B1B; }
   .badge.in_progress { background: #DBEAFE; color: #1E40AF; }
+
+  /* Team */
+  .user-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .user-row:last-child { border-bottom: none; }
+  .user-avatar-sm { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,var(--accent),var(--orange)); color: #fff; font-weight: 800; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .user-info { flex: 1; min-width: 0; }
+  .user-email { font-weight: 700; font-size: 13px; color: var(--dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-sub { font-size: 11px; color: var(--gray-light); }
+  .role-badge { font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 20px; }
+  .role-badge.admin { background: #E0E7FF; color: #3730A3; }
+  .role-badge.viewer { background: #F3F4F6; color: #4B5563; }
+  .user-row select.role-select { width: auto; margin: 0; padding: 5px 8px; font-size: 11.5px; }
+  .icon-btn { background: transparent; border: 1px solid var(--border); border-radius: 7px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--red); flex-shrink: 0; }
+  .icon-btn:hover { background: #FEE2E2; }
+  .viewer-note { font-size: 12px; color: var(--gray); background: var(--bg); border-radius: 8px; padding: 10px 12px; }
 </style>
 </head>
 <body>
@@ -222,6 +237,7 @@
       <a class="active" onclick="scrollToId('top')"><span class="ic">▦</span> Dashboard</a>
       <a onclick="scrollToId('agents-section')"><span class="ic">🤖</span> Agents</a>
       <a onclick="scrollToId('pending-card')"><span class="ic">✅</span> Approvals</a>
+      <a onclick="scrollToId('team-card')"><span class="ic">👥</span> Team</a>
       <a onclick="scrollToId('recent-card')"><span class="ic">📋</span> Tasks</a>
       <a onclick="scrollToId('recent-card')"><span class="ic">🕒</span> Activity</a>
       <a title="Not built yet"><span class="ic">📊</span> Analytics</a>
@@ -278,6 +294,22 @@
         </div>
       </div>
 
+      <div class="card" id="team-card">
+        <div class="card-head"><div><span class="eyebrow">Access</span><h2>Team</h2></div></div>
+        <div id="users-list"><div class="empty">Loading…</div></div>
+        <div id="add-user-form" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+          <div style="font-size:12.5px;font-weight:700;color:var(--dark);margin-bottom:10px;">Add a team member</div>
+          <input id="new-user-email" type="email" placeholder="teammate@digitalaura.com" />
+          <input id="new-user-password" type="password" placeholder="Password (8+ characters — share this with them)" />
+          <select id="new-user-role">
+            <option value="viewer">View only — can see everything, can't approve/reject/create</option>
+            <option value="admin">Full access — can approve, reject, create topics, manage team</option>
+          </select>
+          <button class="primary" id="add-user-btn" onclick="createUser()">Add team member ▸</button>
+          <div id="add-user-status" class="status-msg"></div>
+        </div>
+      </div>
+
       <div class="card" id="recent-card">
         <div class="card-head"><div><span class="eyebrow">Timeline</span><h2>Recent Activity</h2></div></div>
         <div class="filter-tabs" id="filter-tabs"></div>
@@ -297,6 +329,27 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let allRecent = [];
 let activeFilter = 'all';
+let callerRole = 'viewer';
+let callerId = null;
+
+// Custom inline SVG icons (Feather-style, MIT-licensed path data) — no
+// emoji, no external icon font/CDN.
+const ICONS = {
+  content_draft_agent: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  keyword_planner: '<path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.5 3H4a1 1 0 0 0-1 1v5.5a2 2 0 0 0 .83 1.5l9.58 9.59a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83Z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  policy_guardrail_agent: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+  seo_audit_agent: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+  gsc_ga4_watcher_agent: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  content_refresh_agent: '<path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+};
+const ICON_COLORS = {
+  content_draft_agent: '#4F46E5', keyword_planner: '#0EA5E9', policy_guardrail_agent: '#16A34A',
+  seo_audit_agent: '#7C3AED', gsc_ga4_watcher_agent: '#F59E0B', content_refresh_agent: '#EF4444',
+};
+function agentIconSvg(id) {
+  const path = ICONS[id] || '<circle cx="12" cy="12" r="9"/>';
+  return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
 
 window.scrollToId = function (id) {
   const el = document.getElementById(id);
@@ -360,6 +413,8 @@ async function callPanelApi(body) {
 async function loadData() {
   const data = await callPanelApi({ action: 'list' });
   allRecent = data.recent || [];
+  callerRole = data.callerRole || 'viewer';
+  applyRoleUI();
   renderHeroSub(data);
   renderStats(data);
   renderAgents(data.agents || []);
@@ -367,6 +422,13 @@ async function loadData() {
   renderFilterTabs();
   renderRecent();
   renderSites(data.sites || []);
+  loadUsers();
+}
+
+function applyRoleUI() {
+  const isAdmin = callerRole === 'admin';
+  document.getElementById('create-card').style.display = isAdmin ? '' : 'none';
+  document.getElementById('add-user-form').style.display = isAdmin ? '' : 'none';
 }
 
 function renderHeroSub(data) {
@@ -405,18 +467,17 @@ function timeAgoText(iso) {
   return `${Math.round(hrs / 24)}d ago`;
 }
 
-const AGENT_ICONS = { content_draft_agent: '✍️', policy_guardrail_agent: '🛡️', seo_audit_agent: '🔍', gsc_ga4_watcher_agent: '📡', content_refresh_agent: '♻️' };
-
 function renderAgents(agents) {
   const el = document.getElementById('agents-grid');
   if (!agents.length) { el.innerHTML = '<div class="empty">No agent data yet.</div>'; return; }
   el.innerHTML = agents.map(a => {
     const status = timeAgoStatus(a.lastRun);
     const statusLabel = status === 'live' ? 'Active' : status === 'stale' ? 'Idle' : 'Not run yet';
+    const color = ICON_COLORS[a.id] || '#4F46E5';
     return `
       <div class="agent-card">
         <div class="agent-card-top">
-          <div class="agent-icon">${AGENT_ICONS[a.id] || '🤖'}</div>
+          <div class="agent-icon" style="background:${color}1A;color:${color};">${agentIconSvg(a.id)}</div>
           <div class="agent-name-wrap">
             <span class="agent-name">${escapeHtml(a.name)}</span>
             <span class="agent-status-badge ${status}"><span class="dot"></span>${statusLabel}</span>
@@ -437,13 +498,16 @@ function renderPending(items) {
     el.innerHTML = `<div class="empty-state"><div class="ic">✓</div><b>Inbox zero</b><p>No drafts waiting for approval right now.</p></div>`;
     return;
   }
+  const isAdmin = callerRole === 'admin';
   el.innerHTML = items.map(t => `
     <div class="draft-item">
       <div class="draft-title">${escapeHtml(t.payload?.title || '(no title)')}</div>
       <div class="draft-meta">${escapeHtml(t.sites?.domain || '')} · ${new Date(t.created_at).toLocaleString()}</div>
       <div class="draft-excerpt">${escapeHtml(t.payload?.excerpt || '')}</div>
-      <button class="approve" onclick="handleApprove('${t.id}')">✅ Approve &amp; Publish as Draft</button>
-      <button class="reject" onclick="handleReject('${t.id}')">❌ Reject</button>
+      ${isAdmin ? `
+        <button class="approve" onclick="handleApprove('${t.id}')">✅ Approve &amp; Publish as Draft</button>
+        <button class="reject" onclick="handleReject('${t.id}')">❌ Reject</button>
+      ` : `<div class="viewer-note">View-only account — ask an admin to approve or reject.</div>`}
       <div id="status-${t.id}" class="status-msg"></div>
     </div>
   `).join('');
@@ -526,8 +590,10 @@ window.createTopic = async function () {
   statusEl.textContent = 'Creating…';
   statusEl.className = 'status-msg';
   try {
-    await callPanelApi({ action: 'create_topic', siteId, topic, originalElement });
-    statusEl.textContent = 'Task created — the agent will draft it on its next run.';
+    const res = await callPanelApi({ action: 'create_topic', siteId, topic, originalElement });
+    statusEl.textContent = res.immediate
+      ? 'Task created — drafting now, check back in ~1-2 minutes.'
+      : 'Task created — the agent will draft it on its next scheduled run (within 15 min).';
     statusEl.className = 'status-msg ok';
     document.getElementById('topic-input').value = '';
     document.getElementById('original-element-input').value = '';
@@ -535,6 +601,79 @@ window.createTopic = async function () {
   } catch (e) {
     statusEl.textContent = e.message;
     statusEl.className = 'status-msg error';
+  }
+};
+
+async function loadUsers() {
+  const el = document.getElementById('users-list');
+  try {
+    const data = await callPanelApi({ action: 'list_users' });
+    const { data: { user } } = await supabase.auth.getUser();
+    callerId = user?.id;
+    const isAdmin = callerRole === 'admin';
+    el.innerHTML = (data.users || []).map(u => `
+      <div class="user-row">
+        <div class="user-avatar-sm">${escapeHtml((u.email || '??').slice(0, 2).toUpperCase())}</div>
+        <div class="user-info">
+          <div class="user-email">${escapeHtml(u.email)}${u.id === callerId ? ' (you)' : ''}</div>
+          <div class="user-sub">${u.last_sign_in_at ? 'Last active ' + timeAgoText(u.last_sign_in_at) : 'Never signed in'}</div>
+        </div>
+        ${isAdmin && u.id !== callerId ? `
+          <select class="role-select" onchange="updateUserRole('${u.id}', this.value)">
+            <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>View only</option>
+            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Full access</option>
+          </select>
+          <button class="icon-btn" title="Remove" onclick="deleteUser('${u.id}','${escapeHtml(u.email)}')">✕</button>
+        ` : `<span class="role-badge ${u.role}">${u.role === 'admin' ? 'Full access' : 'View only'}</span>`}
+      </div>
+    `).join('') || '<div class="empty">No team members yet.</div>';
+  } catch (e) {
+    el.innerHTML = `<div class="empty">Could not load team list.</div>`;
+  }
+}
+
+window.createUser = async function () {
+  const email = document.getElementById('new-user-email').value.trim();
+  const password = document.getElementById('new-user-password').value;
+  const role = document.getElementById('new-user-role').value;
+  const statusEl = document.getElementById('add-user-status');
+  if (!email || !password || password.length < 8) {
+    statusEl.textContent = 'Enter an email and an 8+ character password.';
+    statusEl.className = 'status-msg error';
+    return;
+  }
+  statusEl.textContent = 'Adding…';
+  statusEl.className = 'status-msg';
+  try {
+    await callPanelApi({ action: 'create_user', email, password, role });
+    statusEl.textContent = `Added — share the email/password with them directly.`;
+    statusEl.className = 'status-msg ok';
+    document.getElementById('new-user-email').value = '';
+    document.getElementById('new-user-password').value = '';
+    loadUsers();
+  } catch (e) {
+    statusEl.textContent = e.message;
+    statusEl.className = 'status-msg error';
+  }
+};
+
+window.updateUserRole = async function (userId, role) {
+  try {
+    await callPanelApi({ action: 'update_user_role', userId, role });
+    loadUsers();
+  } catch (e) {
+    alert(e.message);
+    loadUsers();
+  }
+};
+
+window.deleteUser = async function (userId, email) {
+  if (!confirm(`Remove ${email} from the panel? They will no longer be able to log in.`)) return;
+  try {
+    await callPanelApi({ action: 'delete_user', userId });
+    loadUsers();
+  } catch (e) {
+    alert(e.message);
   }
 };
 
