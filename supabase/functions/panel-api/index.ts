@@ -75,12 +75,13 @@ Deno.serve(async (req) => {
   const action = body.action as string;
 
   if (action === 'list') {
-    const [{ data: pending }, { data: recent }, { data: sites }, { data: results }, { data: sysStatus }] = await Promise.all([
+    const [{ data: pending }, { data: recent }, { data: sites }, { data: results }, { data: sysStatus }, { data: agentSettingsRows }] = await Promise.all([
       supabase.from('agent_tasks').select('*, sites(domain)').eq('task_type', 'approve_draft').eq('status', 'awaiting_approval').order('created_at', { ascending: false }),
       supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').order('created_at', { ascending: false }).limit(30),
       supabase.from('sites').select('id, domain, name').order('domain'),
       supabase.from('agent_results').select('agent_name, created_at, result').order('created_at', { ascending: false }).limit(200),
       supabase.from('system_status').select('*').eq('id', 1).single(),
+      supabase.from('agent_settings').select('agent_name, enabled'),
     ]);
 
     // Known agents this system runs, with static metadata (schedule/description
@@ -93,8 +94,11 @@ Deno.serve(async (req) => {
       { id: 'seo_audit_agent', name: 'SEO Audit Agent', description: 'Weekly deep audit: striking-distance keywords, low-CTR pages, query movement, content gaps.', schedule: 'Weekly (Monday)' },
       { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Daily' },
       { id: 'content_refresh_agent', name: 'Content Refresh Agent', description: 'Refreshes underperforming content flagged by the Watcher.', schedule: 'Not built yet' },
+      { id: 'topic_discovery_agent', name: 'Topic Discovery Agent', description: 'Finds what to write next: striking-distance queries, content gaps, and trending queries from real Search Console + Keyword Planner data, ranked with strategic reasoning. Emails a ready-to-use shortlist — a human still supplies the real fact each draft needs and creates the topic.', schedule: 'Daily', toggleable: true },
       { id: 'manager_agent', name: 'Manager Agent', description: 'Watches every other agent for stale runs or error spikes — auto-pauses all automation and emails you if something looks broken.', schedule: 'Every 10 minutes' },
     ];
+    const agentSettingsMap: Record<string, boolean> = {};
+    for (const row of agentSettingsRows || []) agentSettingsMap[row.agent_name] = row.enabled;
     const lastRunByAgent: Record<string, string> = {};
     for (const r of results || []) {
       if (!lastRunByAgent[r.agent_name]) lastRunByAgent[r.agent_name] = r.created_at;
@@ -107,7 +111,13 @@ Deno.serve(async (req) => {
         }
       }
     }
-    const agents = AGENTS.map((a) => ({ ...a, lastRun: lastRunByAgent[a.id] || null }));
+    const agents = AGENTS.map((a) => ({
+      ...a,
+      lastRun: lastRunByAgent[a.id] || null,
+      // Default true when no row exists yet (agent never explicitly toggled) —
+      // must never read as "off" just because it's never been touched.
+      enabled: a.toggleable ? (agentSettingsMap[a.id] !== false) : true,
+    }));
 
     const { role: callerRole } = await getCaller(req);
 
@@ -178,6 +188,29 @@ Deno.serve(async (req) => {
     }
 
     return json({ ok: true, task: data[0], immediate: dispatched });
+  }
+
+  if (action === 'toggle_agent') {
+    const { isAdmin, user: caller } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'Only admins can turn agents on or off.' }, 403);
+
+    const { agentName, enabled } = body as { agentName?: string; enabled?: boolean };
+    // Whitelist which agents can be toggled from here — this must never become
+    // a generic switch for agents that don't check agent_settings (content
+    // draft / policy guardrail / manager are controlled by the global
+    // automation_paused kill-switch only, on purpose).
+    const TOGGLEABLE_AGENTS = ['topic_discovery_agent'];
+    if (!agentName || !TOGGLEABLE_AGENTS.includes(agentName)) {
+      return json({ error: 'This agent cannot be toggled individually.' }, 400);
+    }
+    const { error } = await supabase.from('agent_settings').upsert({
+      agent_name: agentName,
+      enabled: !!enabled,
+      updated_at: new Date().toISOString(),
+      updated_by: caller?.email || 'Panel',
+    });
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true, agentName, enabled: !!enabled });
   }
 
   // ---- User management (admin only) ----

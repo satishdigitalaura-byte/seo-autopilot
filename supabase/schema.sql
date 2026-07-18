@@ -113,6 +113,23 @@ create table if not exists core_update_status (
 );
 
 -- ============================================================
+-- 7. AGENT_SETTINGS — per-agent on/off switch (separate from the global
+-- system_status.automation_paused kill-switch). Lets a human disable ONE
+-- specific agent (e.g. topic_discovery_agent) from the panel without
+-- affecting any other agent.
+-- ============================================================
+create table if not exists agent_settings (
+  agent_name  text primary key,
+  enabled     boolean not null default true,
+  updated_at  timestamptz not null default now(),
+  updated_by  text
+);
+
+insert into agent_settings (agent_name, enabled)
+values ('topic_discovery_agent', true)
+on conflict (agent_name) do nothing;
+
+-- ============================================================
 -- updated_at auto-touch trigger (shared by sites + agent_tasks + site_credentials)
 -- ============================================================
 create or replace function touch_updated_at()
@@ -148,3 +165,4 @@ alter table agent_tasks         enable row level security;
 alter table agent_results       enable row level security;
 alter table event_log           enable row level security;
 alter table core_update_status  enable row level security;
+alter table agent_settings      enable row level security;

@@ -145,6 +145,14 @@
   .agent-status-badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
   .agent-desc { font-size: 12px; color: var(--gray); line-height: 1.5; margin-bottom: 12px; min-height: 36px; }
   .agent-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--gray-light); font-weight: 700; border-top: 1px solid var(--border); padding-top: 10px; }
+  .agent-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
+  .agent-toggle-label { font-size: 11px; font-weight: 700; color: var(--gray); flex: 1; }
+  .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider { position: absolute; cursor: pointer; inset: 0; background: #D1D5DB; border-radius: 20px; transition: .15s; }
+  .switch .slider::before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+  .switch input:checked + .slider { background: #16A34A; }
+  .switch input:checked + .slider::before { transform: translateX(16px); }
 
   /* Two column */
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; align-items: start; }
@@ -353,12 +361,13 @@ const ICONS = {
   seo_audit_agent: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
   gsc_ga4_watcher_agent: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
   content_refresh_agent: '<path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  topic_discovery_agent: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v3l2 2"/>',
   manager_agent: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
 };
 const ICON_COLORS = {
   content_draft_agent: '#4F46E5', keyword_planner: '#0EA5E9', policy_guardrail_agent: '#16A34A',
   seo_audit_agent: '#7C3AED', gsc_ga4_watcher_agent: '#F59E0B', content_refresh_agent: '#EF4444',
-  manager_agent: '#0F766E',
+  topic_discovery_agent: '#DB2777', manager_agent: '#0F766E',
 };
 function agentIconSvg(id) {
   const path = ICONS[id] || '<circle cx="12" cy="12" r="9"/>';
@@ -466,6 +475,19 @@ window.resumeAutomation = async function () {
   }
 };
 
+// Turns ONE specific agent on/off (currently only Topic Discovery Agent).
+// This is separate from the global pause banner — it never touches any
+// other agent, and the server-side whitelist enforces the same.
+window.toggleAgent = async function (agentId, enabled) {
+  try {
+    await callPanelApi({ action: 'toggle_agent', agentName: agentId, enabled });
+    loadData();
+  } catch (e) {
+    alert(e.message);
+    loadData(); // revert the checkbox visually if the call failed
+  }
+};
+
 function applyRoleUI() {
   const isAdmin = callerRole === 'admin';
   document.getElementById('create-card').style.display = isAdmin ? '' : 'none';
@@ -515,6 +537,7 @@ function renderAgents(agents) {
     const status = timeAgoStatus(a.lastRun);
     const statusLabel = status === 'live' ? 'Active' : status === 'stale' ? 'Idle' : 'Not run yet';
     const color = ICON_COLORS[a.id] || '#4F46E5';
+    const showToggle = a.toggleable && callerRole === 'admin';
     return `
       <div class="agent-card">
         <div class="agent-card-top">
@@ -529,6 +552,14 @@ function renderAgents(agents) {
           <span>${escapeHtml(a.schedule)}</span>
           <span>${timeAgoText(a.lastRun)}</span>
         </div>
+        ${showToggle ? `
+        <div class="agent-toggle-row">
+          <span class="agent-toggle-label">${a.enabled ? 'On — finding topics automatically' : 'Off — won\\'t run until turned back on'}</span>
+          <label class="switch">
+            <input type="checkbox" ${a.enabled ? 'checked' : ''} onchange="toggleAgent('${a.id}', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>` : ''}
       </div>`;
   }).join('');
 }
