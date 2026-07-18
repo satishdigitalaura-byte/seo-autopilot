@@ -75,11 +75,12 @@ Deno.serve(async (req) => {
   const action = body.action as string;
 
   if (action === 'list') {
-    const [{ data: pending }, { data: recent }, { data: sites }, { data: results }] = await Promise.all([
+    const [{ data: pending }, { data: recent }, { data: sites }, { data: results }, { data: sysStatus }] = await Promise.all([
       supabase.from('agent_tasks').select('*, sites(domain)').eq('task_type', 'approve_draft').eq('status', 'awaiting_approval').order('created_at', { ascending: false }),
       supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').order('created_at', { ascending: false }).limit(30),
       supabase.from('sites').select('id, domain, name').order('domain'),
       supabase.from('agent_results').select('agent_name, created_at, result').order('created_at', { ascending: false }).limit(200),
+      supabase.from('system_status').select('*').eq('id', 1).single(),
     ]);
 
     // Known agents this system runs, with static metadata (schedule/description
@@ -92,6 +93,7 @@ Deno.serve(async (req) => {
       { id: 'seo_audit_agent', name: 'SEO Audit Agent', description: 'Weekly deep audit: striking-distance keywords, low-CTR pages, query movement, content gaps.', schedule: 'Weekly (Monday)' },
       { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Daily' },
       { id: 'content_refresh_agent', name: 'Content Refresh Agent', description: 'Refreshes underperforming content flagged by the Watcher.', schedule: 'Not built yet' },
+      { id: 'manager_agent', name: 'Manager Agent', description: 'Watches every other agent for stale runs or error spikes — auto-pauses all automation and emails you if something looks broken.', schedule: 'Every 10 minutes' },
     ];
     const lastRunByAgent: Record<string, string> = {};
     for (const r of results || []) {
@@ -109,7 +111,21 @@ Deno.serve(async (req) => {
 
     const { role: callerRole } = await getCaller(req);
 
-    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole });
+    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null });
+  }
+
+  if (action === 'resume_automation') {
+    const { isAdmin, user: caller } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'Only admins can resume automation.' }, 403);
+
+    const { error } = await supabase.from('system_status').update({
+      automation_paused: false,
+      pause_reason: null,
+      resumed_at: new Date().toISOString(),
+      resumed_by: caller?.email || 'Panel',
+    }).eq('id', 1);
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
   }
 
   if (action === 'approve' || action === 'reject') {

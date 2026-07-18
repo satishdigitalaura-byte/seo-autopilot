@@ -1,8 +1,15 @@
 import 'dotenv/config';
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { processContentDraftTask } from '../agents/contentDraftAgent.js';
+import { isAutomationPaused } from '../lib/systemStatus.js';
 
 async function main() {
+  const { paused, reason } = await isAutomationPaused();
+  if (paused) {
+    console.log(`Automation is PAUSED (${reason || 'no reason given'}) — skipping this run entirely.`);
+    return;
+  }
+
   const supabase = getSupabaseClient();
 
   const { data: tasks, error } = await supabase

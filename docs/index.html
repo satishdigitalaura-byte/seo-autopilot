@@ -209,6 +209,17 @@
   .icon-btn { background: transparent; border: 1px solid var(--border); border-radius: 7px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--red); flex-shrink: 0; }
   .icon-btn:hover { background: #FEE2E2; }
   .viewer-note { font-size: 12px; color: var(--gray); background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+
+  /* Paused banner */
+  .paused-banner {
+    background: #FEF2F2; border: 1px solid #FECACA; border-radius: 14px;
+    padding: 16px 20px; margin-bottom: 22px; display: flex; align-items: flex-start; gap: 12px;
+  }
+  .paused-banner .ic { font-size: 20px; flex-shrink: 0; }
+  .paused-banner b { color: #991B1B; font-size: 14px; display: block; margin-bottom: 3px; }
+  .paused-banner p { color: #7F1D1D; font-size: 12.5px; margin: 0 0 10px; line-height: 1.5; }
+  .paused-banner button { background: #991B1B; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+  .paused-banner button:hover { background: #7F1D1D; }
 </style>
 </head>
 <body>
@@ -260,6 +271,7 @@
     </div>
 
     <main class="content" id="top">
+      <div id="paused-banner"></div>
       <div class="hero">
         <div class="hero-badge"><span class="dot"></span> AI Autopilot · Live</div>
         <h1 id="hero-greeting">Good day.</h1>
@@ -341,10 +353,12 @@ const ICONS = {
   seo_audit_agent: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
   gsc_ga4_watcher_agent: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
   content_refresh_agent: '<path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  manager_agent: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
 };
 const ICON_COLORS = {
   content_draft_agent: '#4F46E5', keyword_planner: '#0EA5E9', policy_guardrail_agent: '#16A34A',
   seo_audit_agent: '#7C3AED', gsc_ga4_watcher_agent: '#F59E0B', content_refresh_agent: '#EF4444',
+  manager_agent: '#0F766E',
 };
 function agentIconSvg(id) {
   const path = ICONS[id] || '<circle cx="12" cy="12" r="9"/>';
@@ -415,6 +429,7 @@ async function loadData() {
   allRecent = data.recent || [];
   callerRole = data.callerRole || 'viewer';
   applyRoleUI();
+  renderPausedBanner(data.systemStatus);
   renderHeroSub(data);
   renderStats(data);
   renderAgents(data.agents || []);
@@ -424,6 +439,32 @@ async function loadData() {
   renderSites(data.sites || []);
   loadUsers();
 }
+
+function renderPausedBanner(status) {
+  const el = document.getElementById('paused-banner');
+  if (!status?.automation_paused) { el.innerHTML = ''; return; }
+  const isAdmin = callerRole === 'admin';
+  el.innerHTML = `
+    <div class="paused-banner">
+      <span class="ic">🛑</span>
+      <div style="flex:1;">
+        <b>Automation is paused — the Manager Agent found a problem</b>
+        <p>${escapeHtml(status.pause_reason || 'No reason recorded.')}</p>
+        <p style="margin-bottom:0;">Nothing will run (no drafts, no reviews, no audits) until this is resumed.${isAdmin ? '' : ' Ask an admin to review and resume.'}</p>
+        ${isAdmin ? `<button onclick="resumeAutomation()">Resume automation ▸</button>` : ''}
+      </div>
+    </div>`;
+}
+
+window.resumeAutomation = async function () {
+  if (!confirm('Resume automation? Only do this after you\'ve checked what the Manager Agent flagged.')) return;
+  try {
+    await callPanelApi({ action: 'resume_automation' });
+    loadData();
+  } catch (e) {
+    alert(e.message);
+  }
+};
 
 function applyRoleUI() {
   const isAdmin = callerRole === 'admin';
