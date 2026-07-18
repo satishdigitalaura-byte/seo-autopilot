@@ -25,23 +25,29 @@ const STALE_GRACE_MULTIPLIER = 3; // e.g. content_draft_agent flagged only if si
 const ERROR_SPIKE_MIN_SAMPLE = 5;
 const ERROR_SPIKE_RATE = 0.5; // >50% of recent tasks failing
 
+// NOT "no result produced recently" — that fires even when an agent is
+// perfectly healthy but simply had no work to do (e.g. no new topic was
+// added, so content_draft_agent has nothing to draft). The only real signal
+// of a stuck/broken agent is a task that was actually handed to it and sat
+// there unprocessed well past a normal run cycle — that means the runner
+// picked it up (or should have) and never finished, which is a genuine fault.
 async function checkStaleness(supabase) {
   const problems = [];
   for (const [agent, intervalMin] of Object.entries(AGENT_SCHEDULES_MIN)) {
-    const { data } = await supabase
-      .from('agent_results')
-      .select('created_at')
-      .eq('agent_name', agent)
-      .order('created_at', { ascending: false })
+    const staleBefore = new Date(Date.now() - intervalMin * STALE_GRACE_MULTIPLIER * 60000).toISOString();
+    const { data: stuckTasks } = await supabase
+      .from('agent_tasks')
+      .select('id, created_at, status')
+      .eq('target_agent', agent)
+      .in('status', ['pending', 'in_progress'])
+      .lt('created_at', staleBefore)
       .limit(1);
-    const last = data?.[0]?.created_at;
-    if (!last) continue; // never run yet (e.g. weekly agent on day 1) — not a fault, don't false-positive
-    const minsAgo = (Date.now() - new Date(last).getTime()) / 60000;
-    if (minsAgo > intervalMin * STALE_GRACE_MULTIPLIER) {
+    if (stuckTasks && stuckTasks.length > 0) {
+      const minsAgo = Math.round((Date.now() - new Date(stuckTasks[0].created_at).getTime()) / 60000);
       problems.push({
         type: 'stale',
         agent,
-        detail: `${agent} hasn't produced a result in ${Math.round(minsAgo)} minutes (expected roughly every ${intervalMin} min). It may have stopped running.`,
+        detail: `${agent} has a task stuck as "${stuckTasks[0].status}" for ${minsAgo} minutes (expected to be handled within roughly ${intervalMin} min). It looks like it stopped running mid-work, not that there's simply nothing to do.`,
       });
     }
   }
