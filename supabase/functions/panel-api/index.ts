@@ -175,17 +175,10 @@ Deno.serve(async (req) => {
     if (error) return json({ error: error.message }, 500);
 
     // Try to run it right now instead of waiting for the next cron tick.
+    // content-draft.yml now chains straight into the guardrail review itself
+    // once the draft is done, so there's no longer a fixed-delay guess here
+    // that can race against a slow draft.
     const dispatched = await triggerWorkflow('content-draft.yml');
-    if (dispatched) {
-      // @ts-ignore — EdgeRuntime is available in the Supabase Edge Functions
-      // runtime; this lets the draft finish (~20-30s) before we also kick
-      // off the guardrail review, without holding the client's request open.
-      // deno-lint-ignore no-explicit-any
-      (globalThis as any).EdgeRuntime?.waitUntil((async () => {
-        await new Promise((r) => setTimeout(r, 30000));
-        await triggerWorkflow('policy-guardrail.yml');
-      })());
-    }
 
     return json({ ok: true, task: data[0], immediate: dispatched });
   }

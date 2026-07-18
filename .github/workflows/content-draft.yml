@@ -14,7 +14,17 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
-      - run: npm run content:run
+      # Run the draft, then immediately run the guardrail review in the SAME job —
+      # instead of waiting for the guardrail's own cron (which can be badly delayed)
+      # or a fixed 30s panel-side timer (which races with slow drafts). Looping a
+      # few rounds also carries a rejected draft through its automatic revise cycle
+      # without a human needing to trigger anything again.
+      - name: Run content draft + guardrail review (up to 3 rounds)
+        run: |
+          for i in 1 2 3; do
+            npm run content:run
+            npm run guardrail:run
+          done
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -25,3 +35,8 @@ jobs:
           GOOGLE_ADS_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_ADS_OAUTH_CLIENT_ID }}
           GOOGLE_ADS_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_OAUTH_CLIENT_SECRET }}
           GOOGLE_ADS_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_OAUTH_REFRESH_TOKEN }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAILS: ${{ secrets.NOTIFY_EMAILS }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          APPROVE_SECRET: ${{ secrets.APPROVE_SECRET }}
