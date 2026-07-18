@@ -75,7 +75,7 @@ create index if not exists idx_agent_tasks_site on agent_tasks (site_id, status)
 create table if not exists agent_results (
   id          uuid primary key default gen_random_uuid(),
   task_id     uuid references agent_tasks(id) on delete set null,
-  site_id     uuid not null references sites(id) on delete cascade,
+  site_id     uuid references sites(id) on delete cascade, -- nullable: manager_agent isn't scoped to one site
   agent_name  text not null,
   result      jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now()
