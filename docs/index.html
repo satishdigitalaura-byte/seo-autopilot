@@ -6,52 +6,20 @@
 <title>SEO Autopilot — Panel</title>
 <style>
   :root {
-    --dark: #0A1628; --dark2: #132038; --blue: #1A6FE8; --orange: #FF6B2B;
-    --green: #22C55E; --red: #EF4444; --gray: #6B7280; --gray-light: #9CA3AF;
-    --bg: #F4F6FB; --card: #FFFFFF; --border: #E5E7EB;
+    --sidebar: #0B1220; --sidebar2: #0F1A2E;
+    --accent: #4F46E5; --accent2: #6366F1;
+    --orange: #FF6B2B; --green: #22C55E; --red: #EF4444; --amber: #F59E0B;
+    --gray: #6B7280; --gray-light: #9CA3AF;
+    --bg: #F5F6FA; --card: #FFFFFF; --border: #E5E7EB;
+    --dark: #0A1628;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg); color: #1F2937; -webkit-font-smoothing: antialiased;
   }
-  header {
-    background: linear-gradient(135deg, var(--dark), var(--dark2));
-    color: #fff; padding: 18px 28px;
-    display: flex; align-items: center; justify-content: space-between;
-    box-shadow: 0 2px 12px rgba(10,22,40,0.15);
-  }
-  header .brand { display: flex; align-items: center; gap: 10px; }
-  header .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 4px rgba(255,107,43,0.2); }
-  header .brand-text { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
-  header .brand-text span { color: #9CA9C7; font-size: 12px; font-weight: 500; margin-left: 8px; }
-  header button {
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff;
-    padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
-    transition: background 0.15s;
-  }
-  header button:hover { background: rgba(255,255,255,0.16); }
-  main { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; }
 
-  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
-  .stat-card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-    padding: 18px 20px; box-shadow: 0 1px 3px rgba(16,24,40,0.04);
-  }
-  .stat-card .stat-num { font-size: 28px; font-weight: 800; color: var(--dark); line-height: 1; }
-  .stat-card .stat-label { font-size: 12px; color: var(--gray); margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-  .stat-card.accent-orange .stat-num { color: var(--orange); }
-  .stat-card.accent-green .stat-num { color: var(--green); }
-  .stat-card.accent-red .stat-num { color: var(--red); }
-
-  .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
-    padding: 22px 26px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(16,24,40,0.04);
-  }
-  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-  h2 { font-size: 16px; color: var(--dark); margin: 0; font-weight: 800; display: flex; align-items: center; gap: 8px; }
-  .card-sub { font-size: 12px; color: var(--gray); margin-top: 2px; font-weight: 500; }
-
+  /* ---------- Login ---------- */
   .login-box {
     max-width: 380px; margin: 90px auto; text-align: center;
     background: var(--card); border-radius: 18px; padding: 40px 32px;
@@ -59,58 +27,173 @@
   }
   .login-box .logo-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--orange); margin: 0 auto 14px; box-shadow: 0 0 0 5px rgba(255,107,43,0.15); }
   .login-box h1 { font-size: 21px; color: var(--dark); margin: 0 0 4px; font-weight: 800; }
-
   input, select, textarea {
     width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px;
     font-size: 14px; margin-bottom: 12px; font-family: inherit; background: #FAFBFF;
     transition: border-color 0.15s;
   }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); background: #fff; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); background: #fff; }
   textarea { min-height: 84px; resize: vertical; }
-
   button.primary {
-    background: var(--blue); color: #fff; border: none; padding: 11px 20px;
+    background: var(--accent); color: #fff; border: none; padding: 11px 20px;
     border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 14px;
     transition: background 0.15s; width: 100%;
   }
-  button.primary:hover { background: #1558bf; }
+  button.primary:hover { background: #4338CA; }
   button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
-  button.approve { background: var(--green); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; margin-right: 8px; font-size: 13px; }
-  button.reject { background: var(--red); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; }
-  button.approve:hover { background: #16a34a; } button.reject:hover { background: #dc2626; }
+  .status-msg { font-size: 13px; margin-top: 10px; font-weight: 600; }
+  .status-msg.error { color: var(--red); }
+  .status-msg.ok { color: var(--green); }
 
-  .draft-item { border-bottom: 1px solid var(--border); padding: 18px 0; }
+  /* ---------- App shell ---------- */
+  #app-screen { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 232px; flex-shrink: 0; background: var(--sidebar); color: #E5E7EB;
+    display: flex; flex-direction: column; padding: 18px 14px; position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 18px; }
+  .sidebar-brand .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 4px rgba(255,107,43,0.2); }
+  .sidebar-brand .name { font-weight: 800; font-size: 14px; color: #fff; line-height: 1.2; }
+  .sidebar-brand .sub { font-size: 11px; color: #7C8AAE; }
+
+  .workspace { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 9px 10px; margin-bottom: 16px; font-size: 12.5px; }
+  .workspace .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .workspace .wtext { line-height: 1.3; }
+  .workspace .wtext b { display: block; color: #fff; font-size: 12.5px; }
+  .workspace .wtext span { color: #7C8AAE; font-size: 10.5px; }
+
+  nav.sidenav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  nav.sidenav a {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px;
+    color: #A7B2CC; text-decoration: none; font-size: 13px; font-weight: 600; cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  nav.sidenav a:hover { background: rgba(255,255,255,0.05); color: #fff; }
+  nav.sidenav a.active { background: rgba(79,70,229,0.18); color: #fff; border-left-color: var(--accent2); }
+  nav.sidenav a .ic { width: 16px; text-align: center; opacity: 0.9; }
+
+  .sidebar-footer { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 10px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,var(--accent),var(--orange)); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; color: #fff; flex-shrink: 0; }
+  .sidebar-footer .who { line-height: 1.25; flex: 1; min-width: 0; }
+  .sidebar-footer .who b { display: block; font-size: 12.5px; color: #fff; }
+  .sidebar-footer .who span { font-size: 10.5px; color: #7C8AAE; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .sidebar-footer button { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #A7B2CC; border-radius: 7px; padding: 5px 9px; font-size: 11px; cursor: pointer; font-weight: 700; }
+  .sidebar-footer button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+  .main-wrap { flex: 1; min-width: 0; }
+
+  .topbar {
+    display: flex; align-items: center; gap: 14px; padding: 14px 28px;
+    background: #fff; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;
+  }
+  .search-box { flex: 1; max-width: 420px; display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; color: var(--gray); font-size: 13px; }
+  .pill { font-size: 11.5px; font-weight: 700; padding: 5px 11px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; }
+  .pill.ok { background: #DCFCE7; color: #166534; }
+  .pill.ok .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .topbar-spacer { flex: 1; }
+  .qc-btn { background: var(--accent); color: #fff; border: none; padding: 9px 16px; border-radius: 9px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+  .qc-btn:hover { background: #4338CA; }
+
+  main.content { max-width: 1120px; margin: 0 auto; padding: 24px 28px 60px; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #0A1628, #16213D 60%, #1A2E5C); color: #fff;
+    border-radius: 18px; padding: 26px 30px; margin-bottom: 22px; position: relative; overflow: hidden;
+  }
+  .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 4px 12px; font-size: 11px; font-weight: 700; margin-bottom: 14px; }
+  .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(34,197,94,0.25); }
+  .hero h1 { font-size: 25px; font-weight: 800; margin: 0 0 6px; }
+  .hero p { color: #B9C4E0; font-size: 13.5px; margin: 0 0 18px; }
+  .hero-actions { display: flex; gap: 10px; }
+  .hero-actions button { border-radius: 9px; padding: 10px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .hero-actions .btn-primary { background: var(--accent2); border: none; color: #fff; }
+  .hero-actions .btn-ghost { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.18); color: #fff; }
+
+  /* Stat row */
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; box-shadow: 0 1px 3px rgba(16,24,40,0.04);
+  }
+  .stat-card .stat-label { font-size: 10.5px; color: var(--gray); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .stat-card .stat-num { font-size: 27px; font-weight: 800; color: var(--dark); line-height: 1; }
+  .stat-card.accent-orange .stat-num { color: var(--orange); }
+  .stat-card.accent-green .stat-num { color: var(--green); }
+  .stat-card.accent-red .stat-num { color: var(--red); }
+  .stat-card.accent-indigo .stat-num { color: var(--accent); }
+
+  /* Section head */
+  .section-eyebrow { font-size: 10.5px; font-weight: 800; color: var(--gray-light); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-head h2 { font-size: 17px; color: var(--dark); margin: 0; font-weight: 800; }
+  .section-head button { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; font-size: 12px; font-weight: 700; color: var(--dark); cursor: pointer; }
+  .section-head button:hover { background: var(--bg); }
+
+  /* Agent cards */
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 26px; }
+  .agent-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 17px 18px; box-shadow: 0 1px 3px rgba(16,24,40,0.04); }
+  .agent-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .agent-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; background: #EEF2FF; color: var(--accent); flex-shrink: 0; }
+  .agent-name-wrap { flex: 1; min-width: 0; margin-left: 10px; }
+  .agent-name { font-weight: 700; font-size: 13.5px; color: var(--dark); display: block; }
+  .agent-status-badge { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; }
+  .agent-status-badge.live { background: #DCFCE7; color: #166534; }
+  .agent-status-badge.stale { background: #FEF3C7; color: #92400E; }
+  .agent-status-badge.none { background: #F3F4F6; color: #6B7280; }
+  .agent-status-badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .agent-desc { font-size: 12px; color: var(--gray); line-height: 1.5; margin-bottom: 12px; min-height: 36px; }
+  .agent-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--gray-light); font-weight: 700; border-top: 1px solid var(--border); padding-top: 10px; }
+
+  /* Two column */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; align-items: start; }
+  @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px 22px; box-shadow: 0 1px 3px rgba(16,24,40,0.04);
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .card-head .eyebrow { font-size: 10.5px; font-weight: 800; color: var(--gray-light); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
+  .card-head h2 { font-size: 15.5px; color: var(--dark); margin: 0; font-weight: 800; }
+
+  .empty-state { text-align: center; padding: 26px 10px; }
+  .empty-state .ic { width: 44px; height: 44px; border-radius: 50%; background: #DCFCE7; color: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; margin: 0 auto 12px; }
+  .empty-state b { display: block; font-size: 14px; color: var(--dark); margin-bottom: 4px; }
+  .empty-state p { font-size: 12px; color: var(--gray); margin: 0; }
+
+  .draft-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
   .draft-item:last-child { border-bottom: none; padding-bottom: 4px; }
-  .draft-item:first-child { padding-top: 4px; }
-  .draft-title { font-weight: 700; color: var(--dark); margin-bottom: 4px; font-size: 15px; }
-  .draft-meta { font-size: 12px; color: var(--gray); margin-bottom: 10px; }
-  .draft-excerpt { font-size: 13.5px; color: #374151; margin-bottom: 14px; line-height: 1.5; }
+  .draft-item:first-child { padding-top: 0; }
+  .draft-title { font-weight: 700; color: var(--dark); margin-bottom: 4px; font-size: 14px; }
+  .draft-meta { font-size: 11.5px; color: var(--gray); margin-bottom: 10px; }
+  .draft-excerpt { font-size: 13px; color: #374151; margin-bottom: 12px; line-height: 1.5; }
+  button.approve { background: var(--green); color: #fff; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; margin-right: 8px; font-size: 12.5px; }
+  button.reject { background: var(--red); color: #fff; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12.5px; }
+  button.approve:hover { background: #16a34a; } button.reject:hover { background: #dc2626; }
+  .empty { color: var(--gray); font-size: 13px; padding: 8px 0; }
 
-  .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
-  .agent-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; background: #FAFBFF; }
-  .agent-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-  .agent-name { font-weight: 700; font-size: 13.5px; color: var(--dark); }
-  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .status-dot.live { background: var(--green); box-shadow: 0 0 0 3px rgba(34,197,94,0.18); }
-  .status-dot.stale { background: var(--orange); box-shadow: 0 0 0 3px rgba(255,107,43,0.15); }
-  .status-dot.none { background: var(--gray-light); }
-  .agent-desc { font-size: 12px; color: var(--gray); line-height: 1.5; margin-bottom: 10px; }
-  .agent-meta-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--gray-light); font-weight: 600; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; padding: 10px 8px; color: var(--gray); border-bottom: 2px solid var(--border); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
-  td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
-  tr:hover td { background: #FAFBFF; }
-  .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; display: inline-block; }
+  /* Timeline */
+  .filter-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-tabs button { background: var(--bg); border: 1px solid var(--border); color: var(--gray); padding: 6px 12px; border-radius: 20px; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+  .filter-tabs button.active { background: var(--dark); border-color: var(--dark); color: #fff; }
+  .timeline { display: flex; flex-direction: column; }
+  .tl-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .tl-dot.pending, .tl-dot.awaiting_approval, .tl-dot.in_progress { background: var(--amber); }
+  .tl-dot.completed, .tl-dot.approved { background: var(--green); }
+  .tl-dot.rejected, .tl-dot.failed { background: var(--red); }
+  .tl-main { flex: 1; min-width: 0; }
+  .tl-type { font-weight: 700; font-size: 13px; color: var(--dark); }
+  .tl-site { color: var(--gray); font-weight: 500; }
+  .tl-time { font-size: 11px; color: var(--gray-light); margin-top: 1px; }
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 10.5px; font-weight: 700; display: inline-block; white-space: nowrap; }
   .badge.awaiting_approval, .badge.pending { background: #FEF3C7; color: #92400E; }
   .badge.completed, .badge.approved { background: #DCFCE7; color: #166534; }
   .badge.rejected, .badge.failed { background: #FEE2E2; color: #991B1B; }
   .badge.in_progress { background: #DBEAFE; color: #1E40AF; }
-
-  .empty { color: var(--gray); font-size: 13.5px; padding: 8px 0; }
-  .status-msg { font-size: 13px; margin-top: 10px; font-weight: 600; }
-  .status-msg.error { color: var(--red); }
-  .status-msg.ok { color: var(--green); }
 </style>
 </head>
 <body>
@@ -128,42 +211,81 @@
 </div>
 
 <div id="app-screen" style="display:none;">
-  <header>
-    <div class="brand">
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
       <div class="logo-dot"></div>
-      <div class="brand-text">Digital Aura <span>SEO Autopilot Panel</span></div>
+      <div><div class="name">Digital Aura</div><div class="sub">SEO Autopilot</div></div>
     </div>
-    <button onclick="logout()">Logout</button>
-  </header>
-  <main>
-
-    <div class="stat-row" id="stat-row"></div>
-
-    <div class="card">
-      <div class="card-head"><h2>🤖 Agents</h2></div>
-      <div id="agents-grid"><div class="empty">Loading…</div></div>
+    <div class="workspace"><span class="dot"></span><div class="wtext"><b>thedigitalaura.com</b><span>Pro workspace</span></div></div>
+    <nav class="sidenav">
+      <a class="active" onclick="scrollToId('top')"><span class="ic">▦</span> Dashboard</a>
+      <a onclick="scrollToId('agents-section')"><span class="ic">🤖</span> Agents</a>
+      <a onclick="scrollToId('pending-card')"><span class="ic">✅</span> Approvals</a>
+      <a onclick="scrollToId('recent-card')"><span class="ic">📋</span> Tasks</a>
+      <a onclick="scrollToId('recent-card')"><span class="ic">🕒</span> Activity</a>
+      <a title="Not built yet"><span class="ic">📊</span> Analytics</a>
+      <a title="Not built yet"><span class="ic">⚙️</span> Settings</a>
+      <a title="Not built yet"><span class="ic">❓</span> Help</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="avatar" id="user-avatar">DA</div>
+      <div class="who"><b id="user-name">Loading…</b><span id="user-email"></span></div>
+      <button onclick="logout()">Out</button>
     </div>
+  </aside>
 
-    <div class="card">
-      <div class="card-head"><h2>✅ Pending Approvals</h2></div>
-      <div id="pending-list"><div class="empty">Loading…</div></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>➕ Create New Blog Topic</h2></div>
-      <select id="site-select"></select>
-      <input id="topic-input" type="text" placeholder="Topic (e.g. 'Local SEO Checklist for Hotels')" />
-      <textarea id="original-element-input" placeholder="Real result/fact to base this on (e.g. 'We took a hotel client from page 5 to #1 for jacuzzi suites near me in 3 months, 15,000 extra sessions, 160 monthly bookings')"></textarea>
-      <button class="primary" id="create-topic-btn" onclick="createTopic()" style="width:auto;padding:11px 22px;">Create Draft Task</button>
-      <div id="create-status" class="status-msg"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>🕒 Recent Activity</h2></div>
-      <div id="recent-list"><div class="empty">Loading…</div></div>
+  <div class="main-wrap">
+    <div class="topbar">
+      <div class="search-box">🔍 Search agents, tasks, drafts, sites…</div>
+      <div class="topbar-spacer"></div>
+      <span class="pill ok"><span class="dot"></span> All systems operational</span>
+      <button class="qc-btn" onclick="scrollToId('create-card')">+ Quick create</button>
     </div>
 
-  </main>
+    <main class="content" id="top">
+      <div class="hero">
+        <div class="hero-badge"><span class="dot"></span> AI Autopilot · Live</div>
+        <h1 id="hero-greeting">Good day.</h1>
+        <p id="hero-sub">Loading pipeline status…</p>
+        <div class="hero-actions">
+          <button class="btn-primary" onclick="scrollToId('agents-section')">Run all agents ▸</button>
+          <button class="btn-ghost" onclick="scrollToId('agents-section')">View pipeline ▸</button>
+        </div>
+      </div>
+
+      <div class="stat-row" id="stat-row"></div>
+
+      <div id="agents-section">
+        <div class="section-eyebrow">AUTOPILOT</div>
+        <div class="section-head"><h2>AI Agents</h2></div>
+        <div id="agents-grid" class="agent-grid"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card" id="pending-card">
+          <div class="card-head"><div><span class="eyebrow">Queue</span><h2>Pending Approvals</h2></div></div>
+          <div id="pending-list"><div class="empty">Loading…</div></div>
+        </div>
+
+        <div class="card" id="create-card">
+          <div class="card-head"><div><span class="eyebrow">Compose</span><h2>Create New Blog Topic</h2></div></div>
+          <select id="site-select"></select>
+          <input id="topic-input" type="text" placeholder="Topic (e.g. 'Local SEO Checklist for Hotels')" />
+          <textarea id="original-element-input" placeholder="Real result/fact to base this on (e.g. 'We took a hotel client from page 5 to #1 for jacuzzi suites near me in 3 months — 15,000 extra sessions, 160 monthly bookings')"></textarea>
+          <button class="primary" id="create-topic-btn" onclick="createTopic()">Create draft task ▸</button>
+          <div id="create-status" class="status-msg"></div>
+        </div>
+      </div>
+
+      <div class="card" id="recent-card">
+        <div class="card-head"><div><span class="eyebrow">Timeline</span><h2>Recent Activity</h2></div></div>
+        <div class="filter-tabs" id="filter-tabs"></div>
+        <div id="recent-list" class="timeline"><div class="empty">Loading…</div></div>
+      </div>
+
+    </main>
+  </div>
 </div>
 
 <script type="module">
@@ -173,6 +295,13 @@ const SUPABASE_URL = 'https://wrmgdcmyirnybybqlqll.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndybWdkY215aXJueWJ5YnFscWxsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxMTM1MzcsImV4cCI6MjA5OTY4OTUzN30.wx8ukJ9C_W6LhuLwsfhVlPnluCFVwP7SnTyenlySSBY';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let allRecent = [];
+let activeFilter = 'all';
+
+window.scrollToId = function (id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 
 window.doLogin = async function () {
   const email = document.getElementById('email-input').value.trim();
@@ -203,8 +332,23 @@ function setLoginStatus(msg, cls) {
 
 async function showApp() {
   document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('app-screen').style.display = 'flex';
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user?.email) {
+    document.getElementById('user-email').textContent = user.email;
+    const name = user.email.split('@')[0];
+    document.getElementById('user-name').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    document.getElementById('user-avatar').textContent = name.slice(0, 2).toUpperCase();
+  }
+  renderGreeting();
   await loadData();
+}
+
+function renderGreeting() {
+  const hr = new Date().getHours();
+  const part = hr < 12 ? 'morning' : hr < 17 ? 'afternoon' : 'evening';
+  const name = (document.getElementById('user-name').textContent || '').split(' ')[0] || 'there';
+  document.getElementById('hero-greeting').textContent = `Good ${part}, ${name}.`;
 }
 
 async function callPanelApi(body) {
@@ -215,11 +359,20 @@ async function callPanelApi(body) {
 
 async function loadData() {
   const data = await callPanelApi({ action: 'list' });
+  allRecent = data.recent || [];
+  renderHeroSub(data);
   renderStats(data);
   renderAgents(data.agents || []);
   renderPending(data.pending || []);
-  renderRecent(data.recent || []);
+  renderFilterTabs();
+  renderRecent();
   renderSites(data.sites || []);
+}
+
+function renderHeroSub(data) {
+  const liveAgents = (data.agents || []).filter(a => timeAgoStatus(a.lastRun) === 'live').length;
+  document.getElementById('hero-sub').textContent =
+    `${liveAgents} agent${liveAgents === 1 ? '' : 's'} live · ${(data.recent || []).length} operations in recent history.`;
 }
 
 function renderStats(data) {
@@ -232,8 +385,8 @@ function renderStats(data) {
     { num: (data.pending || []).length, label: 'Awaiting Approval', cls: 'accent-orange' },
     { num: completed, label: 'Completed (recent)', cls: 'accent-green' },
     { num: rejected, label: 'Rejected (recent)', cls: 'accent-red' },
-    { num: `${liveAgents}/${(data.agents || []).length}`, label: 'Agents Active', cls: '' },
-  ].map(s => `<div class="stat-card ${s.cls}"><div class="stat-num">${s.num}</div><div class="stat-label">${s.label}</div></div>`).join('');
+    { num: `${liveAgents}/${(data.agents || []).length}`, label: 'Agents Active', cls: 'accent-indigo' },
+  ].map(s => `<div class="stat-card ${s.cls}"><div class="stat-label">${s.label}</div><div class="stat-num">${s.num}</div></div>`).join('');
 }
 
 function timeAgoStatus(iso) {
@@ -252,16 +405,22 @@ function timeAgoText(iso) {
   return `${Math.round(hrs / 24)}d ago`;
 }
 
+const AGENT_ICONS = { content_draft_agent: '✍️', policy_guardrail_agent: '🛡️', seo_audit_agent: '🔍', gsc_ga4_watcher_agent: '📡', content_refresh_agent: '♻️' };
+
 function renderAgents(agents) {
   const el = document.getElementById('agents-grid');
   if (!agents.length) { el.innerHTML = '<div class="empty">No agent data yet.</div>'; return; }
-  el.innerHTML = `<div class="agent-grid">` + agents.map(a => {
+  el.innerHTML = agents.map(a => {
     const status = timeAgoStatus(a.lastRun);
+    const statusLabel = status === 'live' ? 'Active' : status === 'stale' ? 'Idle' : 'Not run yet';
     return `
       <div class="agent-card">
         <div class="agent-card-top">
-          <span class="agent-name">${escapeHtml(a.name)}</span>
-          <span class="status-dot ${status}" title="${status}"></span>
+          <div class="agent-icon">${AGENT_ICONS[a.id] || '🤖'}</div>
+          <div class="agent-name-wrap">
+            <span class="agent-name">${escapeHtml(a.name)}</span>
+            <span class="agent-status-badge ${status}"><span class="dot"></span>${statusLabel}</span>
+          </div>
         </div>
         <div class="agent-desc">${escapeHtml(a.description)}</div>
         <div class="agent-meta-row">
@@ -269,12 +428,15 @@ function renderAgents(agents) {
           <span>${timeAgoText(a.lastRun)}</span>
         </div>
       </div>`;
-  }).join('') + `</div>`;
+  }).join('');
 }
 
 function renderPending(items) {
   const el = document.getElementById('pending-list');
-  if (!items.length) { el.innerHTML = '<div class="empty">No drafts waiting for approval right now.</div>'; return; }
+  if (!items.length) {
+    el.innerHTML = `<div class="empty-state"><div class="ic">✓</div><b>Inbox zero</b><p>No drafts waiting for approval right now.</p></div>`;
+    return;
+  }
   el.innerHTML = items.map(t => `
     <div class="draft-item">
       <div class="draft-title">${escapeHtml(t.payload?.title || '(no title)')}</div>
@@ -287,18 +449,45 @@ function renderPending(items) {
   `).join('');
 }
 
-function renderRecent(items) {
+function renderFilterTabs() {
+  const counts = { all: allRecent.length, pending: 0, failed: 0, rejected: 0, completed: 0 };
+  for (const t of allRecent) {
+    if (t.status === 'pending' || t.status === 'awaiting_approval' || t.status === 'in_progress') counts.pending++;
+    else if (t.status === 'failed') counts.failed++;
+    else if (t.status === 'rejected') counts.rejected++;
+    else if (t.status === 'completed' || t.status === 'approved') counts.completed++;
+  }
+  const tabs = [
+    ['all', 'All'], ['pending', 'Pending'], ['failed', 'Failed'], ['rejected', 'Rejected'], ['completed', 'Completed'],
+  ];
+  document.getElementById('filter-tabs').innerHTML = tabs.map(([key, label]) =>
+    `<button class="${activeFilter === key ? 'active' : ''}" onclick="setFilter('${key}')">${label} ${counts[key]}</button>`
+  ).join('');
+}
+
+window.setFilter = function (key) {
+  activeFilter = key;
+  renderFilterTabs();
+  renderRecent();
+};
+
+function renderRecent() {
   const el = document.getElementById('recent-list');
-  if (!items.length) { el.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
-  el.innerHTML = `<table><thead><tr><th>Type</th><th>Site</th><th>Status</th><th>When</th></tr></thead><tbody>` +
-    items.map(t => `
-      <tr>
-        <td>${escapeHtml(t.task_type)}</td>
-        <td>${escapeHtml(t.sites?.domain || '—')}</td>
-        <td><span class="badge ${t.status}">${escapeHtml(t.status)}</span></td>
-        <td>${new Date(t.created_at).toLocaleString()}</td>
-      </tr>
-    `).join('') + `</tbody></table>`;
+  let items = allRecent;
+  if (activeFilter === 'pending') items = items.filter(t => ['pending', 'awaiting_approval', 'in_progress'].includes(t.status));
+  else if (activeFilter !== 'all') items = items.filter(t => t.status === activeFilter);
+
+  if (!items.length) { el.innerHTML = '<div class="empty">No activity in this filter.</div>'; return; }
+  el.innerHTML = items.map(t => `
+    <div class="tl-item">
+      <span class="tl-dot ${t.status}"></span>
+      <div class="tl-main">
+        <div class="tl-type">${escapeHtml(t.task_type)} <span class="tl-site">· ${escapeHtml(t.sites?.domain || '—')}</span></div>
+        <div class="tl-time">${timeAgoText(t.created_at)} · ${new Date(t.created_at).toLocaleString()}</div>
+      </div>
+      <span class="badge ${t.status}">${escapeHtml(t.status)}</span>
+    </div>
+  `).join('');
 }
 
 function renderSites(sites) {
