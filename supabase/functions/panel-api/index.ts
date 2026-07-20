@@ -33,6 +33,15 @@ async function getCaller(req: Request) {
   return { user, role, isAdmin: role === 'admin' };
 }
 
+// Only this account may grant/hold admin access to anyone else. Regular
+// admins can still add/manage viewer accounts, but only the owner account
+// can create a new admin or promote/demote an existing one — so admin
+// access can never silently spread beyond who the owner explicitly allows.
+const SUPER_ADMIN_EMAIL = 'satish.digitalaura@gmail.com';
+function isSuperAdmin(user: { email?: string | null } | undefined | null) {
+  return (user?.email || '').toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+}
+
 // Fire GitHub Actions workflows on-demand instead of waiting for their cron,
 // so a topic created from the panel gets drafted immediately. Soft-fails
 // (silently skipped) if GITHUB_TOKEN isn't configured as a function secret —
@@ -235,12 +244,15 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'create_user') {
-    const { isAdmin } = await getCaller(req);
+    const { isAdmin, user: caller } = await getCaller(req);
     if (!isAdmin) return json({ error: 'Only admins can add users.' }, 403);
 
     const { email, password, role } = body as { email?: string; password?: string; role?: string };
     if (!email || !password || password.length < 8) {
       return json({ error: 'A valid email and a password (8+ characters) are required.' }, 400);
+    }
+    if (role === 'admin' && !isSuperAdmin(caller)) {
+      return json({ error: 'Only the owner account can add another admin. You can still add a view-only account.' }, 403);
     }
     const finalRole = role === 'admin' ? 'admin' : 'viewer';
     const { data, error } = await supabase.auth.admin.createUser({
@@ -261,6 +273,9 @@ Deno.serve(async (req) => {
     if (!userId || (role !== 'admin' && role !== 'viewer')) return json({ error: 'userId and a valid role are required.' }, 400);
     if (userId === caller?.id && role !== 'admin') {
       return json({ error: "You can't remove your own admin access." }, 400);
+    }
+    if (role === 'admin' && !isSuperAdmin(caller)) {
+      return json({ error: 'Only the owner account can promote someone to admin.' }, 403);
     }
     const { error } = await supabase.auth.admin.updateUserById(userId, { app_metadata: { role } });
     if (error) return json({ error: error.message }, 500);

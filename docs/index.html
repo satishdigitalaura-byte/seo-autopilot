@@ -370,7 +370,7 @@
           <input id="new-user-password" type="password" placeholder="Password (8+ characters — share this with them)" />
           <select id="new-user-role">
             <option value="viewer">View only — can see everything, can't approve/reject/create</option>
-            <option value="admin">Full access — can approve, reject, create topics, manage team</option>
+            <option value="admin" id="new-user-role-admin-opt">Full access — can approve, reject, create topics, manage team</option>
           </select>
           <button class="primary" id="add-user-btn" onclick="createUser()">Add team member ▸</button>
           <div id="add-user-status" class="status-msg"></div>
@@ -397,6 +397,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let allRecent = [];
 let activeFilter = 'all';
 let callerRole = 'viewer';
+let callerEmail = '';
+const SUPER_ADMIN_EMAIL = 'satish.digitalaura@gmail.com';
 let callerId = null;
 
 // Custom inline SVG icons (Feather-style, MIT-licensed path data) — no
@@ -469,6 +471,7 @@ async function showApp() {
   document.getElementById('app-screen').style.display = 'flex';
   const { data: { user } } = await supabase.auth.getUser();
   if (user?.email) {
+    callerEmail = user.email;
     document.getElementById('user-email').textContent = user.email;
     const name = user.email.split('@')[0];
     document.getElementById('user-name').textContent = name.charAt(0).toUpperCase() + name.slice(1);
@@ -483,6 +486,10 @@ function renderGreeting() {
   const part = hr < 12 ? 'morning' : hr < 17 ? 'afternoon' : 'evening';
   const name = (document.getElementById('user-name').textContent || '').split(' ')[0] || 'there';
   document.getElementById('hero-greeting').textContent = `Good ${part}, ${name}.`;
+}
+
+function isSuperAdminUser() {
+  return callerEmail.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 }
 
 async function callPanelApi(body) {
@@ -586,6 +593,8 @@ function applyRoleUI() {
   const isAdmin = callerRole === 'admin';
   document.getElementById('create-card').style.display = isAdmin ? '' : 'none';
   document.getElementById('add-user-form').style.display = isAdmin ? '' : 'none';
+  const adminOpt = document.getElementById('new-user-role-admin-opt');
+  if (adminOpt) adminOpt.style.display = isSuperAdminUser() ? '' : 'none';
 }
 
 function renderHeroSub(data) {
@@ -785,9 +794,9 @@ async function loadUsers() {
           <div class="user-sub">${u.last_sign_in_at ? 'Last active ' + timeAgoText(u.last_sign_in_at) : 'Never signed in'}</div>
         </div>
         ${isAdmin && u.id !== callerId ? `
-          <select class="role-select" onchange="updateUserRole('${u.id}', this.value)">
+          <select class="role-select" onchange="updateUserRole('${u.id}', this.value)" ${(!isSuperAdminUser() && u.role !== 'admin') ? 'disabled title="Only the owner account can promote someone to admin"' : ''}>
             <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>View only</option>
-            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Full access</option>
+            ${isSuperAdminUser() || u.role === 'admin' ? `<option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Full access</option>` : ''}
           </select>
           <button class="icon-btn" title="Remove" onclick="deleteUser('${u.id}','${escapeHtml(u.email)}')">✕</button>
         ` : `<span class="role-badge ${u.role}">${u.role === 'admin' ? 'Full access' : 'View only'}</span>`}
