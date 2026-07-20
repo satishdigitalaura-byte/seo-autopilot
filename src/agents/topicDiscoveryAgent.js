@@ -4,6 +4,7 @@ import { getStrikingDistanceQueries, getContentGapQueries, getQueryMovement } fr
 import { getKeywordIdeas } from '../lib/googleAdsClient.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell } from '../lib/emailTemplate.js';
+import { getAgentConfig } from '../lib/agentSettings.js';
 
 /**
  * Topic Discovery Agent — a senior SEO strategist that finds WHAT to write
@@ -166,13 +167,21 @@ export async function runTopicDiscoveryForSite(site) {
     return { site: site.domain, decision: 'no_opportunities_found' };
   }
 
+  const agentConfig = await getAgentConfig('topic_discovery_agent');
   const prompt = buildStrategistPrompt(site, digest);
+  const maxTokens = agentConfig.maxTokens || 4000;
   let raw;
   try {
-    raw = await generateText({ prompt, maxTokens: 4000, temperature: 0.5, model: 'gemini-flash-latest' });
+    raw = await generateText({
+      prompt,
+      maxTokens,
+      temperature: 0.5,
+      model: agentConfig.modelName || 'gemini-flash-latest',
+      provider: agentConfig.modelProvider,
+    });
   } catch (err) {
-    console.warn('gemini-flash-latest unavailable for topic discovery, falling back to lite model:', err.message);
-    raw = await generateText({ prompt, maxTokens: 4000, temperature: 0.5 });
+    console.warn(`${agentConfig.modelProvider} model unavailable for topic discovery, falling back to Gemini lite:`, err.message);
+    raw = await generateText({ prompt, maxTokens, temperature: 0.5 });
   }
 
   let analysis;

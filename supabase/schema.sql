@@ -118,11 +118,22 @@ create table if not exists core_update_status (
 -- specific agent (e.g. topic_discovery_agent) from the panel without
 -- affecting any other agent.
 -- ============================================================
+-- model_provider/model_name/min_tokens/max_tokens/run_interval_minutes let
+-- each agent's "engine" be tuned per-agent from the panel — which LLM to
+-- think with, how much it's allowed to generate per call (caps runaway
+-- loops/credit burn), and how often it's allowed to run. Null/absent means
+-- "use the code's own default", so an untouched agent behaves exactly as
+-- before this column existed.
 create table if not exists agent_settings (
-  agent_name  text primary key,
-  enabled     boolean not null default true,
-  updated_at  timestamptz not null default now(),
-  updated_by  text
+  agent_name           text primary key,
+  enabled              boolean not null default true,
+  model_provider       text not null default 'gemini' check (model_provider in ('gemini', 'claude', 'openai')),
+  model_name           text,
+  min_tokens           int,
+  max_tokens           int,
+  run_interval_minutes int,
+  updated_at           timestamptz not null default now(),
+  updated_by           text
 );
 
 insert into agent_settings (agent_name, enabled)

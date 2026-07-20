@@ -261,6 +261,15 @@
     .hero-actions button { min-width: 100%; }
   }
 
+  /* Agent settings */
+  .agent-settings-row { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
+  .agent-settings-btn { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 11px; font-weight: 700; color: var(--dark); cursor: pointer; text-align: left; }
+  .agent-settings-btn:hover { background: #EEF2FF; border-color: var(--accent); }
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(10,22,40,0.55); z-index: 50; align-items: center; justify-content: center; padding: 16px; }
+  .modal-box { background: var(--card); border-radius: 16px; padding: 24px; max-width: 400px; width: 100%; max-height: 90vh; overflow-y: auto; }
+  .modal-box h3 { margin: 0 0 16px; font-size: 16px; color: var(--dark); }
+  .modal-label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray); margin-bottom: 4px; }
+
   /* Paused banner */
   .paused-banner {
     background: #FEF2F2; border: 1px solid #FECACA; border-radius: 14px;
@@ -384,6 +393,39 @@
       </div>
 
     </main>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="agent-settings-modal">
+  <div class="modal-box">
+    <h3 id="agent-settings-title">Agent Settings</h3>
+    <input type="hidden" id="agent-settings-agent-id" />
+    <label class="modal-label">AI model provider</label>
+    <select id="agent-settings-provider">
+      <option value="gemini">Gemini (free tier — default)</option>
+      <option value="claude">Claude (paid — needs ANTHROPIC_API_KEY)</option>
+      <option value="openai">OpenAI (paid — needs OPENAI_API_KEY)</option>
+    </select>
+    <label class="modal-label">Model name (optional override)</label>
+    <input type="text" id="agent-settings-model" placeholder="leave blank for the agent's default model" />
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;">
+        <label class="modal-label">Min tokens</label>
+        <input type="number" id="agent-settings-min-tokens" placeholder="e.g. 5000" min="0" />
+      </div>
+      <div style="flex:1;">
+        <label class="modal-label">Max tokens</label>
+        <input type="number" id="agent-settings-max-tokens" placeholder="e.g. 16000" min="0" />
+      </div>
+    </div>
+    <label class="modal-label">Run interval (minutes, leave blank for default schedule)</label>
+    <input type="number" id="agent-settings-interval" placeholder="e.g. 2880 for every 2 days" min="0" />
+    <div style="font-size:11.5px;color:var(--gray);margin:-6px 0 12px;">Min/max tokens caps how much the model can generate per call (prevents runaway loops/credit waste). Run interval only applies to agents that run on their own schedule — it won't delay a draft you've already asked for.</div>
+    <div style="display:flex;gap:10px;">
+      <button class="primary" onclick="saveAgentSettings()">Save</button>
+      <button type="button" onclick="closeAgentSettings()" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
+    </div>
+    <div id="agent-settings-status" class="status-msg"></div>
   </div>
 </div>
 
@@ -634,6 +676,7 @@ function timeAgoText(iso) {
 }
 
 function renderAgents(agents) {
+  agentsCache = agents;
   const el = document.getElementById('agents-grid');
   if (!agents.length) { el.innerHTML = '<div class="empty">No agent data yet.</div>'; return; }
   el.innerHTML = agents.map(a => {
@@ -663,9 +706,64 @@ function renderAgents(agents) {
             <span class="slider"></span>
           </label>
         </div>` : ''}
+        ${a.configurable && callerRole === 'admin' ? `
+        <div class="agent-settings-row">
+          <button class="agent-settings-btn" onclick="openAgentSettings('${a.id}')">⚙ Settings — ${a.config?.modelProvider || 'gemini'}${a.config?.runIntervalMinutes ? ` · every ${a.config.runIntervalMinutes}m` : ''}</button>
+        </div>` : ''}
       </div>`;
   }).join('');
 }
+
+let agentsCache = [];
+
+window.openAgentSettings = function (agentId) {
+  const a = agentsCache.find(x => x.id === agentId);
+  if (!a) return;
+  const c = a.config || {};
+  document.getElementById('agent-settings-title').textContent = a.name + ' — Settings';
+  document.getElementById('agent-settings-agent-id').value = agentId;
+  document.getElementById('agent-settings-provider').value = c.modelProvider || 'gemini';
+  document.getElementById('agent-settings-model').value = c.modelName || '';
+  document.getElementById('agent-settings-min-tokens').value = c.minTokens ?? '';
+  document.getElementById('agent-settings-max-tokens').value = c.maxTokens ?? '';
+  document.getElementById('agent-settings-interval').value = c.runIntervalMinutes ?? '';
+  document.getElementById('agent-settings-status').textContent = '';
+  document.getElementById('agent-settings-modal').style.display = 'flex';
+};
+
+window.closeAgentSettings = function () {
+  document.getElementById('agent-settings-modal').style.display = 'none';
+};
+
+window.saveAgentSettings = async function () {
+  const agentName = document.getElementById('agent-settings-agent-id').value;
+  const modelProvider = document.getElementById('agent-settings-provider').value;
+  const modelName = document.getElementById('agent-settings-model').value.trim();
+  const minTokens = document.getElementById('agent-settings-min-tokens').value;
+  const maxTokens = document.getElementById('agent-settings-max-tokens').value;
+  const runIntervalMinutes = document.getElementById('agent-settings-interval').value;
+  const statusEl = document.getElementById('agent-settings-status');
+  statusEl.textContent = 'Saving…';
+  statusEl.className = 'status-msg';
+  try {
+    await callPanelApi({
+      action: 'update_agent_config',
+      agentName,
+      modelProvider,
+      modelName: modelName || null,
+      minTokens: minTokens === '' ? null : Number(minTokens),
+      maxTokens: maxTokens === '' ? null : Number(maxTokens),
+      runIntervalMinutes: runIntervalMinutes === '' ? null : Number(runIntervalMinutes),
+    });
+    statusEl.textContent = 'Saved ✓';
+    statusEl.className = 'status-msg ok';
+    await loadData();
+    setTimeout(closeAgentSettings, 600);
+  } catch (e) {
+    statusEl.textContent = e.message;
+    statusEl.className = 'status-msg error';
+  }
+};
 
 function renderPending(items) {
   const el = document.getElementById('pending-list');

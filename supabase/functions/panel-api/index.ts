@@ -90,24 +90,37 @@ Deno.serve(async (req) => {
       supabase.from('sites').select('id, domain, name').order('domain'),
       supabase.from('agent_results').select('agent_name, created_at, result').order('created_at', { ascending: false }).limit(200),
       supabase.from('system_status').select('*').eq('id', 1).single(),
-      supabase.from('agent_settings').select('agent_name, enabled'),
+      supabase.from('agent_settings').select('*'),
     ]);
 
     // Known agents this system runs, with static metadata (schedule/description
     // don't live in the DB) merged with the most recent real activity timestamp
     // per agent, so the panel shows whether each one is actually alive.
+    // configurable: true means the panel's Agent Settings modal (model
+    // provider/name, token caps, run interval) applies to it — only agents
+    // that actually call an LLM and/or run on their own schedule qualify.
     const AGENTS = [
-      { id: 'content_draft_agent', name: 'Content Draft Agent', description: 'Writes SEO-optimized blog drafts from real client results, following the full on-page checklist.', schedule: 'Every 15 minutes' },
+      { id: 'content_draft_agent', name: 'Content Draft Agent', description: 'Writes SEO-optimized blog drafts from real client results, following the full on-page checklist.', schedule: 'Every 15 minutes', configurable: true },
       { id: 'keyword_planner', name: 'Keyword Planner', description: 'Pulls real Google Ads search-volume + Search Console query data before every draft — never invented numbers.', schedule: 'Runs inside Content Draft Agent' },
-      { id: 'policy_guardrail_agent', name: 'Policy Guardrail Agent', description: 'Reviews every draft before it reaches a human — rejects spam/policy violations, sends Slack + email for approval.', schedule: 'Every 10 minutes' },
+      { id: 'policy_guardrail_agent', name: 'Policy Guardrail Agent', description: 'Reviews every draft before it reaches a human — rejects spam/policy violations, sends Slack + email for approval.', schedule: 'Every 10 minutes', configurable: true },
       { id: 'seo_audit_agent', name: 'SEO Audit Agent', description: 'Weekly deep audit: striking-distance keywords, low-CTR pages, query movement, content gaps.', schedule: 'Weekly (Monday)' },
       { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Daily' },
       { id: 'content_refresh_agent', name: 'Content Refresh Agent', description: 'Refreshes underperforming content flagged by the Watcher.', schedule: 'Not built yet' },
-      { id: 'topic_discovery_agent', name: 'Topic Discovery Agent', description: 'Finds what to write next: striking-distance queries, content gaps, and trending queries from real Search Console + Keyword Planner data, ranked with strategic reasoning. Emails a ready-to-use shortlist — a human still supplies the real fact each draft needs and creates the topic.', schedule: 'Daily', toggleable: true },
+      { id: 'topic_discovery_agent', name: 'Topic Discovery Agent', description: 'Finds what to write next: striking-distance queries, content gaps, and trending queries from real Search Console + Keyword Planner data, ranked with strategic reasoning. Emails a ready-to-use shortlist — a human still supplies the real fact each draft needs and creates the topic.', schedule: 'Daily', toggleable: true, configurable: true },
       { id: 'manager_agent', name: 'Manager Agent', description: 'Watches every other agent for stale runs or error spikes — auto-pauses all automation and emails you if something looks broken.', schedule: 'Every 10 minutes' },
     ];
     const agentSettingsMap: Record<string, boolean> = {};
-    for (const row of agentSettingsRows || []) agentSettingsMap[row.agent_name] = row.enabled;
+    const agentConfigMap: Record<string, any> = {};
+    for (const row of agentSettingsRows || []) {
+      agentSettingsMap[row.agent_name] = row.enabled;
+      agentConfigMap[row.agent_name] = {
+        modelProvider: row.model_provider || 'gemini',
+        modelName: row.model_name || null,
+        minTokens: row.min_tokens ?? null,
+        maxTokens: row.max_tokens ?? null,
+        runIntervalMinutes: row.run_interval_minutes ?? null,
+      };
+    }
     const lastRunByAgent: Record<string, string> = {};
     for (const r of results || []) {
       if (!lastRunByAgent[r.agent_name]) lastRunByAgent[r.agent_name] = r.created_at;
@@ -126,6 +139,9 @@ Deno.serve(async (req) => {
       // Default true when no row exists yet (agent never explicitly toggled) —
       // must never read as "off" just because it's never been touched.
       enabled: a.toggleable ? (agentSettingsMap[a.id] !== false) : true,
+      config: a.configurable
+        ? (agentConfigMap[a.id] || { modelProvider: 'gemini', modelName: null, minTokens: null, maxTokens: null, runIntervalMinutes: null })
+        : null,
     }));
 
     const { role: callerRole } = await getCaller(req);
@@ -227,6 +243,41 @@ Deno.serve(async (req) => {
     });
     if (error) return json({ error: error.message }, 500);
     return json({ ok: true, agentName, enabled: !!enabled });
+  }
+
+  if (action === 'update_agent_config') {
+    const { isAdmin, user: caller } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'Only admins can change agent settings.' }, 403);
+
+    const { agentName, modelProvider, modelName, minTokens, maxTokens, runIntervalMinutes } = body as {
+      agentName?: string; modelProvider?: string; modelName?: string | null;
+      minTokens?: number | null; maxTokens?: number | null; runIntervalMinutes?: number | null;
+    };
+    // Same reasoning as toggle_agent's whitelist — only agents whose code
+    // actually reads agent_settings for these fields (via getAgentConfig)
+    // may be configured here.
+    const CONFIGURABLE_AGENTS = ['content_draft_agent', 'policy_guardrail_agent', 'topic_discovery_agent'];
+    if (!agentName || !CONFIGURABLE_AGENTS.includes(agentName)) {
+      return json({ error: 'This agent has no configurable settings.' }, 400);
+    }
+    if (modelProvider && !['gemini', 'claude', 'openai'].includes(modelProvider)) {
+      return json({ error: 'modelProvider must be gemini, claude, or openai.' }, 400);
+    }
+    if (maxTokens != null && minTokens != null && Number(minTokens) > Number(maxTokens)) {
+      return json({ error: 'Min tokens cannot be greater than max tokens.' }, 400);
+    }
+    const { error } = await supabase.from('agent_settings').upsert({
+      agent_name: agentName,
+      model_provider: modelProvider || 'gemini',
+      model_name: modelName || null,
+      min_tokens: minTokens ?? null,
+      max_tokens: maxTokens ?? null,
+      run_interval_minutes: runIntervalMinutes ?? null,
+      updated_at: new Date().toISOString(),
+      updated_by: caller?.email || 'Panel',
+    });
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
   }
 
   // ---- User management (admin only) ----

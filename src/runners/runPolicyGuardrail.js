@@ -2,11 +2,23 @@ import 'dotenv/config';
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { processGuardrailTask } from '../agents/policyGuardrailAgent.js';
 import { isAutomationPaused } from '../lib/systemStatus.js';
+import { isAgentEnabled } from '../lib/agentSettings.js';
 
 async function main() {
   const { paused, reason } = await isAutomationPaused();
   if (paused) {
     console.log(`Automation is PAUSED (${reason || 'no reason given'}) — skipping this run entirely.`);
+    return;
+  }
+
+  // Note: no run_interval throttle here on purpose — same reasoning as
+  // content_draft_agent. This processes an already-queued review task, and
+  // content-draft.yml also calls this runner directly, back-to-back with the
+  // draft, right after "Create Topic" — throttling it would silently
+  // reintroduce the reject/revise-forever bug that was fixed earlier.
+  const enabled = await isAgentEnabled('policy_guardrail_agent');
+  if (!enabled) {
+    console.log('Policy Guardrail Agent is turned OFF in the panel — skipping this run.');
     return;
   }
 

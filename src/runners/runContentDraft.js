@@ -2,11 +2,23 @@ import 'dotenv/config';
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { processContentDraftTask } from '../agents/contentDraftAgent.js';
 import { isAutomationPaused } from '../lib/systemStatus.js';
+import { isAgentEnabled } from '../lib/agentSettings.js';
 
 async function main() {
   const { paused, reason } = await isAutomationPaused();
   if (paused) {
     console.log(`Automation is PAUSED (${reason || 'no reason given'}) — skipping this run entirely.`);
+    return;
+  }
+
+  // Note: no run_interval throttle here on purpose. This runner only ever
+  // processes tasks a human or another agent already explicitly queued (via
+  // "Create Topic" or a rejected-draft revision) — throttling that queue
+  // would delay a human's own request and would fight the fix that makes a
+  // draft flow straight through to Pending Approvals without a cron wait.
+  const enabled = await isAgentEnabled('content_draft_agent');
+  if (!enabled) {
+    console.log('Content Draft Agent is turned OFF in the panel — skipping this run.');
     return;
   }
 

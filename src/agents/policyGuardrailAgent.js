@@ -5,8 +5,9 @@ import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell, renderApprovalButtons } from '../lib/emailTemplate.js';
 import { sendSlackApproval } from '../lib/slackClient.js';
 import { approveUrl } from '../lib/approvalLinks.js';
+import { getAgentConfig } from '../lib/agentSettings.js';
 
-async function runQualitativeCheck(payload) {
+async function runQualitativeCheck(payload, agentConfig) {
   const prompt = `You are a content policy checker for an SEO agency, applying Google's own published guidance (not invented AI-SEO tactics).
 
 Evaluate this content against three tests only:
@@ -21,7 +22,12 @@ ${String(payload.content || '').slice(0, 6000)}
 
 Reply with ONLY a JSON object, no other text: {"uniquePov": boolean, "eeatSignalsPresent": boolean, "noFiller": boolean, "reasoning": "one sentence"}`;
 
-  const text = (await generateText({ prompt, maxTokens: 300 })) || '{}';
+  const text = (await generateText({
+    prompt,
+    maxTokens: agentConfig.maxTokens || 300,
+    model: agentConfig.modelName || undefined,
+    provider: agentConfig.modelProvider,
+  })) || '{}';
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     return JSON.parse(jsonMatch ? jsonMatch[0] : text);
@@ -56,12 +62,13 @@ export async function processGuardrailTask(task) {
   }
 
   const { data: site } = await supabase.from('sites').select('*').eq('id', task.site_id).single();
+  const agentConfig = await getAgentConfig('policy_guardrail_agent');
 
   const { checks, hardFailures, escalations, forcesHumanReview } = runRuleChecks(task.payload, site);
 
   let qualitative = null;
   if (hardFailures.length === 0 && task.payload.content) {
-    qualitative = await runQualitativeCheck(task.payload);
+    qualitative = await runQualitativeCheck(task.payload, agentConfig);
   }
 
   // The qualitative check is a subjective AI opinion, not a mechanical rule —

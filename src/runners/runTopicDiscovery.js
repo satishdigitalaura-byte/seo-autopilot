@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { runTopicDiscoveryForSite } from '../agents/topicDiscoveryAgent.js';
 import { isAutomationPaused } from '../lib/systemStatus.js';
-import { isAgentEnabled } from '../lib/agentSettings.js';
+import { isAgentEnabled, isAgentDueToRun } from '../lib/agentSettings.js';
 
 async function main() {
   const { paused, reason } = await isAutomationPaused();
@@ -16,6 +16,15 @@ async function main() {
   const enabled = await isAgentEnabled('topic_discovery_agent');
   if (!enabled) {
     console.log('Topic Discovery Agent is turned OFF in the panel — skipping this run.');
+    return;
+  }
+
+  // This agent runs on its own initiative (a daily cron, not a task queue),
+  // so it's the one runner where "run every N minutes/days" from the panel
+  // (Agent Settings) makes sense to honor directly.
+  const dueToRun = await isAgentDueToRun('topic_discovery_agent');
+  if (!dueToRun) {
+    console.log('Topic Discovery Agent already ran within its configured interval — skipping this run.');
     return;
   }
 

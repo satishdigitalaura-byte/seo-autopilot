@@ -4,6 +4,7 @@ import { researchKeywords } from '../lib/keywordResearch.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell } from '../lib/emailTemplate.js';
+import { getAgentConfig } from '../lib/agentSettings.js';
 
 /**
  * Content Draft Agent — writes a blog/page draft with Gemini, then hands it to
@@ -35,6 +36,7 @@ export async function processContentDraftTask(task) {
   const supabase = getSupabaseClient();
   const p = task.payload || {};
   const topic = p.targetKeyword || p.topic;
+  const agentConfig = await getAgentConfig('content_draft_agent');
 
   // §6 hard gate — no original element, no draft. This can never be filled in
   // automatically (it has to be a real fact/data point a human supplies), so
@@ -192,15 +194,22 @@ Return ONLY a JSON object, no other text:
   // the default "lite" model under-delivers on word count even for the smaller 1000-1600
   // target (consistently 600-800 words across repeated runs), not just 1800+ pillar topics —
   // so every draft now uses the full gemini-flash-latest model; still free tier, still near-$0.
-  const maxTokens = isCompetitiveTopic ? 16000 : 9000;
+  const maxTokens = agentConfig.maxTokens || (isCompetitiveTopic ? 16000 : 9000);
   async function generateDraft() {
     let text;
     try {
-      text = await generateText({ prompt, maxTokens, temperature: 0.6, model: 'gemini-flash-latest' });
+      text = await generateText({
+        prompt,
+        maxTokens,
+        temperature: 0.6,
+        model: agentConfig.modelName || 'gemini-flash-latest',
+        provider: agentConfig.modelProvider,
+      });
     } catch (err) {
-      // gemini-flash-latest occasionally 503s under high demand — fall back to the
-      // lite model rather than blocking the whole pipeline on a transient outage.
-      console.warn('gemini-flash-latest unavailable, falling back to lite model:', err.message);
+      // The configured model/provider occasionally errors under high demand —
+      // fall back to the free Gemini lite model rather than blocking the
+      // whole pipeline on a transient outage.
+      console.warn(`${agentConfig.modelProvider} model unavailable, falling back to Gemini lite:`, err.message);
       text = await generateText({ prompt, maxTokens, temperature: 0.6 });
     }
     const m = text.match(/\{[\s\S]*\}/);
