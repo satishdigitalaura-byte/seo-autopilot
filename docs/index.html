@@ -154,6 +154,14 @@
   .switch input:checked + .slider { background: #16A34A; }
   .switch input:checked + .slider::before { transform: translateX(16px); }
 
+  /* Master automation toggle (sidebar) */
+  .master-toggle { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 10px; margin-bottom: 12px; }
+  .master-toggle .mt-text { flex: 1; line-height: 1.3; }
+  .master-toggle .mt-text b { display: block; color: #fff; font-size: 12px; }
+  .master-toggle .mt-text span { color: #7C8AAE; font-size: 10.5px; }
+  .master-toggle.is-off { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); }
+  .master-toggle.is-off .mt-text span { color: #FCA5A5; }
+
   /* Two column */
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; align-items: start; }
   @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
@@ -218,6 +226,41 @@
   .icon-btn:hover { background: #FEE2E2; }
   .viewer-note { font-size: 12px; color: var(--gray); background: var(--bg); border-radius: 8px; padding: 10px 12px; }
 
+  /* ---------- Mobile responsive ---------- */
+  .hamburger-btn { display: none; background: transparent; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+  .sidebar-backdrop { display: none; }
+  @media (max-width: 900px) {
+    #app-screen { display: block; }
+    .hamburger-btn { display: flex; }
+    .sidebar {
+      position: fixed; top: 0; left: 0; z-index: 30; height: 100vh;
+      transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-backdrop.open {
+      display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 25;
+    }
+    .main-wrap { width: 100%; }
+    .topbar { padding: 12px 14px; gap: 10px; }
+    .search-box { display: none; }
+    .topbar-spacer { display: none; }
+    .qc-btn { white-space: nowrap; padding: 9px 12px; font-size: 12px; }
+    .pill { display: none; }
+    main.content { padding: 16px 14px 60px; }
+    .hero { padding: 20px 18px; }
+    .hero h1 { font-size: 20px; }
+    .hero-actions { flex-wrap: wrap; }
+    .hero-actions button { flex: 1; min-width: 130px; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .agent-grid { grid-template-columns: 1fr; }
+    .card { padding: 16px 16px; }
+    .section-head { flex-wrap: wrap; gap: 8px; }
+  }
+  @media (max-width: 420px) {
+    .stat-row { grid-template-columns: 1fr; }
+    .hero-actions button { min-width: 100%; }
+  }
+
   /* Paused banner */
   .paused-banner {
     background: #FEF2F2; border: 1px solid #FECACA; border-radius: 14px;
@@ -246,12 +289,15 @@
 
 <div id="app-screen" style="display:none;">
 
-  <aside class="sidebar">
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
+
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="logo-dot"></div>
       <div><div class="name">Digital Aura</div><div class="sub">SEO Autopilot</div></div>
     </div>
     <div class="workspace"><span class="dot"></span><div class="wtext"><b>thedigitalaura.com</b><span>Pro workspace</span></div></div>
+    <div id="master-toggle-wrap"></div>
     <nav class="sidenav">
       <a class="active" onclick="scrollToId('top')"><span class="ic">▦</span> Dashboard</a>
       <a onclick="scrollToId('agents-section')"><span class="ic">🤖</span> Agents</a>
@@ -272,6 +318,7 @@
 
   <div class="main-wrap">
     <div class="topbar">
+      <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
       <div class="search-box">🔍 Search agents, tasks, drafts, sites…</div>
       <div class="topbar-spacer"></div>
       <span class="pill ok"><span class="dot"></span> All systems operational</span>
@@ -377,6 +424,17 @@ function agentIconSvg(id) {
 window.scrollToId = function (id) {
   const el = document.getElementById(id);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  closeSidebar();
+};
+
+window.toggleSidebar = function () {
+  document.getElementById('sidebar')?.classList.toggle('open');
+  document.getElementById('sidebar-backdrop')?.classList.toggle('open');
+};
+
+window.closeSidebar = function () {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-backdrop')?.classList.remove('open');
 };
 
 window.doLogin = async function () {
@@ -439,6 +497,7 @@ async function loadData() {
   callerRole = data.callerRole || 'viewer';
   applyRoleUI();
   renderPausedBanner(data.systemStatus);
+  renderMasterToggle(data.systemStatus);
   renderHeroSub(data);
   renderStats(data);
   renderAgents(data.agents || []);
@@ -472,6 +531,41 @@ window.resumeAutomation = async function () {
     loadData();
   } catch (e) {
     alert(e.message);
+  }
+};
+
+// Admin-only master switch: instantly stops (or resumes) every single agent —
+// separate from the Manager Agent's own auto-pause banner above. Toggling
+// this off writes automation_paused = true, which every runner already
+// checks before doing any work, so it takes effect on the very next run.
+function renderMasterToggle(status) {
+  const wrap = document.getElementById('master-toggle-wrap');
+  if (callerRole !== 'admin') { wrap.innerHTML = ''; return; }
+  const isOn = !status?.automation_paused;
+  wrap.innerHTML = `
+    <div class="master-toggle ${isOn ? '' : 'is-off'}">
+      <div class="mt-text">
+        <b>All agents</b>
+        <span>${isOn ? 'Running normally' : 'Stopped by admin'}</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" ${isOn ? 'checked' : ''} onchange="toggleMasterAutomation(this.checked)" />
+        <span class="slider"></span>
+      </label>
+    </div>`;
+}
+
+window.toggleMasterAutomation = async function (enable) {
+  if (!enable && !confirm('Stop ALL agents right now? Nothing will run (no drafts, no reviews, no audits) until you switch this back on.')) {
+    renderMasterToggle({ automation_paused: false });
+    return;
+  }
+  try {
+    await callPanelApi({ action: enable ? 'resume_automation' : 'pause_automation' });
+    loadData();
+  } catch (e) {
+    alert(e.message);
+    loadData();
   }
 };
 

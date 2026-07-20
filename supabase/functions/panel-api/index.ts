@@ -124,6 +124,20 @@ Deno.serve(async (req) => {
     return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null });
   }
 
+  if (action === 'pause_automation') {
+    const { isAdmin, user: caller } = await getCaller(req);
+    if (!isAdmin) return json({ error: 'Only admins can pause automation.' }, 403);
+
+    const { error } = await supabase.from('system_status').update({
+      automation_paused: true,
+      pause_reason: `Manually paused by admin (${caller?.email || 'Panel'}) — all agents stopped until resumed.`,
+      paused_at: new Date().toISOString(),
+      paused_by: caller?.email || 'Panel',
+    }).eq('id', 1);
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
+  }
+
   if (action === 'resume_automation') {
     const { isAdmin, user: caller } = await getCaller(req);
     if (!isAdmin) return json({ error: 'Only admins can resume automation.' }, 403);
