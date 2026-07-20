@@ -159,14 +159,15 @@ ORIGINAL ELEMENT (the backbone of the article): ${p.originalElement}
 ${p.triggerReason ? `WHY WE ARE WRITING THIS: ${p.triggerReason}` : ''}
 ${p.originalContent ? `EXISTING CONTENT TO REFRESH (genuinely improve it, do not just reword):\n${String(p.originalContent).slice(0, 4000)}` : ''}
 ${site?.is_ymyl ? `\nTHIS IS A YMYL SITE — be extra precise and cautious with any factual/health/financial claims.` : ''}
-${p.reasons?.qualitative?.reasoning ? `
+${p.reasons?.qualitative?.reasoning || p.reasons?.hardFailures?.length ? `
 ═══ THIS IS A REVISION — THE PREVIOUS DRAFT WAS REJECTED, DO NOT REPEAT THE SAME MISTAKE ═══
-Rejection reason: "${p.reasons.qualitative.reasoning}"
+${p.reasons?.qualitative?.reasoning ? `Rejection reason: "${p.reasons.qualitative.reasoning}"
 Fix this specifically, not just cosmetically:
 - If rejected for lacking a unique POV/being generic "checklist" content: do NOT write a generic listicle at all — build the entire article around the ORIGINAL ELEMENT as the story/angle (a specific result, decision, or mistake), the way Google's own example contrasts "7 Tips for X" against "Why We Waived the Inspection & Saved Money." Every H2 should extend that specific angle, not restate generic industry advice.
 - If rejected for missing E-E-A-T signals: make the firsthand voice ("in our experience," "our client," a specific timeframe/result) unmistakable throughout, not just in one sentence.
-- If rejected for filler/padding intro: the first sentence must be the ORIGINAL ELEMENT's specific fact or result — reread checklist rule 12 above and follow it exactly.
-This is attempt-after-rejection — a second generic draft will be rejected again, so change the actual substance and structure, not just the wording.` : ''}
+- If rejected for filler/padding intro: the first sentence must be the ORIGINAL ELEMENT's specific fact or result — reread checklist rule 12 above and follow it exactly.` : ''}
+${p.reasons?.hardFailures?.includes('content_length') ? `Rejection reason: the previous draft was TOO SHORT (${p.reasons.ruleChecks?.find((c) => c.id === 'content_length')?.detail || `under ${wordMin} words`}). This is a hard minimum, not a suggestion. Do not pad with filler to hit the count — instead cover EVERY H2 subtopic in genuinely more depth: more concrete detail tied to the ORIGINAL ELEMENT, a worked example, specific numbers, or an extra relevant subtopic as its own H2. Write the full ${wordMin}+ words this time — a draft that falls short again will be rejected again.` : ''}
+This is attempt-after-rejection — repeating the same draft will be rejected again, so change the actual substance and structure/length, not just the wording.` : ''}
 
 Return ONLY a JSON object, no other text:
 {

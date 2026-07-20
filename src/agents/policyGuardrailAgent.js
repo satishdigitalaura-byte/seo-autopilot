@@ -73,7 +73,13 @@ export async function processGuardrailTask(task) {
   // checks (the actual policy gates) still have to pass either way.
   const revisionCount = task.payload.revisionCount || 0;
   const qualitativeRejects = qualitative?.uniquePov === false && revisionCount < 3;
-  const rejected = hardFailures.length > 0 || qualitativeRejects;
+  // content_length is the one hard check that's a model-effort problem, not a
+  // policy/safety problem (unlike hidden_text, sneaky_redirect, etc, which
+  // must always block). If it's STILL short after several genuine attempts,
+  // surface it to a human rather than looping forever between the two agents.
+  const onlyContentLengthFails = hardFailures.length > 0 && hardFailures.every((c) => c.id === 'content_length');
+  const hardRejects = hardFailures.length > 0 && !(onlyContentLengthFails && revisionCount >= 3);
+  const rejected = hardRejects || qualitativeRejects;
   const resultSummary = {
     ruleChecks: checks,
     hardFailures: hardFailures.map((c) => c.id),
@@ -81,7 +87,7 @@ export async function processGuardrailTask(task) {
     forcesHumanReview,
     qualitative,
     decision: rejected ? 'rejected' : 'passed_to_human_review',
-    forcedToHumanAfterRevisions: !rejected && qualitative?.uniquePov === false,
+    forcedToHumanAfterRevisions: !rejected && (qualitative?.uniquePov === false || onlyContentLengthFails),
   };
 
   await supabase.from('agent_results').insert({
@@ -155,7 +161,7 @@ export async function processGuardrailTask(task) {
         <tr><td style="padding:4px 0;color:#6B7280;vertical-align:top;">Why written</td><td style="padding:4px 0;">${task.payload.triggerReason || ''}</td></tr>
       </table>
       <p style="margin-top:16px;padding:12px 16px;background:#F8FAFF;border-radius:8px;color:#374151;">${task.payload.excerpt || ''}</p>
-      ${resultSummary.forcedToHumanAfterRevisions ? `<p style="margin-top:16px;padding:12px 16px;background:#FFF7ED;border-radius:8px;color:#9A3412;"><strong>Note:</strong> the AI quality-checker rejected this draft ${revisionCount} time(s) for being too generic and still isn't fully satisfied — it's being sent to you directly instead of looping forever. Please read it a bit more carefully than usual before approving.</p>` : ''}
+      ${resultSummary.forcedToHumanAfterRevisions ? `<p style="margin-top:16px;padding:12px 16px;background:#FFF7ED;border-radius:8px;color:#9A3412;"><strong>Note:</strong> this draft was rejected ${revisionCount} time(s) — ${onlyContentLengthFails ? 'it kept coming in shorter than the required word count' : 'the AI quality-checker judged it too generic'} — and still isn't fully satisfied. It's being sent to you directly instead of looping forever. Please read it a bit more carefully than usual before approving.</p>` : ''}
       <p style="margin-top:16px;font-size:13px;color:#6B7280;">This is not live yet &mdash; nothing publishes until a human approves it.</p>
       ${reviewTask ? renderApprovalButtons({ approveHref: approveUrl(reviewTask.id, 'approve'), rejectHref: approveUrl(reviewTask.id, 'reject') }) : ''}
     `;
