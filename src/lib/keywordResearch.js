@@ -2,6 +2,7 @@ import { getSupabaseClient } from './supabaseClient.js';
 import { getRelatedQueries } from './gscClient.js';
 import { generateText } from './llmClient.js';
 import { getKeywordIdeas } from './googleAdsClient.js';
+import { scoreKeywords, clusterKeywords } from './keywordStrategy.js';
 
 /**
  * Real keyword research for a topic, before any content gets written.
@@ -32,9 +33,13 @@ export async function researchKeywords(site, topic) {
     // seeds (e.g. "local", "businesses") pull in broad, unrelated ideas.
     getKeywordIdeas([topic]),
   ]);
-  const topAdsIdeas = adsKeywordIdeas
-    .sort((a, b) => b.avgMonthlySearches - a.avgMonthlySearches)
-    .slice(0, 20);
+  // Advanced Keyword Planner: score every real Ads idea by derived difficulty
+  // + opportunity (volume vs. difficulty vs. real demand trend), best-first.
+  const scoredAdsIdeas = scoreKeywords(adsKeywordIdeas);
+  const topAdsIdeas = scoredAdsIdeas.slice(0, 20);
+  // Group the real keywords into intent clusters so the brief can target a
+  // cluster of related terms, not one bare keyword (LLM organises real data only).
+  const keywordClusters = await clusterKeywords(topAdsIdeas, topic).catch(() => []);
 
   const prompt = `You are doing keyword research for an SEO content brief. You are NOT allowed to invent search volume or difficulty numbers — you don't have that data. Your only job is to organize the REAL data given below and suggest natural keyword phrasing a human would actually type.
 
@@ -45,8 +50,11 @@ TOPIC: ${topic}
 REAL search queries that already bring visitors to this site, related to this topic (from Google Search Console — genuine data, may be empty for a brand-new topic):
 ${realQueries.length ? realQueries.slice(0, 20).map((q) => `- "${q.query}" (${q.clicks} clicks, ${q.impressions} impressions, avg position ${q.position.toFixed(1)})`).join('\n') : '(none yet — this is a new topic for this site, no historical query data)'}
 
-REAL monthly search volume from Google Ads Keyword Planner (genuine data, may be empty if not configured):
-${topAdsIdeas.length ? topAdsIdeas.map((k) => `- "${k.keyword}" (~${k.avgMonthlySearches}/mo, competition: ${k.competition})`).join('\n') : '(not available for this request — rely on the GSC data and topic above only)'}
+REAL monthly search volume from Google Ads Keyword Planner, with derived difficulty/opportunity scores (genuine volume data; difficulty 0-100 and opportunity 0-100 are transparent heuristics derived from Google's own competition + volume figures, not official Google numbers — may be empty if not configured):
+${topAdsIdeas.length ? topAdsIdeas.map((k) => `- "${k.keyword}" (~${k.avgMonthlySearches}/mo, difficulty ${k.difficulty}, opportunity ${k.opportunity}, demand ${k.demandTrend || 'unknown'})`).join('\n') : '(not available for this request — rely on the GSC data and topic above only)'}
+
+REAL keyword clusters (related terms grouped by shared search intent — target a whole cluster in one strong page rather than one bare keyword):
+${keywordClusters.length ? keywordClusters.map((c) => `- ${c.clusterName} [${c.intent}]: ${(c.keywords || []).slice(0, 6).join(', ')}`).join('\n') : '(no clusters — not enough keyword data)'}
 
 Based on the topic and the real data above (if any), return ONLY a JSON object:
 {
@@ -78,5 +86,10 @@ Based on the topic and the real data above (if any), return ONLY a JSON object:
     };
   }
 
-  return { ...parsed, realQueriesUsed: realQueries.slice(0, 20), adsKeywordIdeasUsed: topAdsIdeas };
+  return {
+    ...parsed,
+    realQueriesUsed: realQueries.slice(0, 20),
+    adsKeywordIdeasUsed: topAdsIdeas,
+    keywordClusters,
+  };
 }
