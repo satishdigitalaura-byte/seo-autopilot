@@ -107,6 +107,8 @@ Deno.serve(async (req) => {
       { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Daily' },
       { id: 'content_refresh_agent', name: 'Content Refresh Agent', description: 'Refreshes underperforming content flagged by the Watcher.', schedule: 'Not built yet' },
       { id: 'topic_discovery_agent', name: 'Topic Discovery Agent', description: 'Finds what to write next: striking-distance queries, content gaps, and trending queries from real Search Console + Keyword Planner data, ranked with strategic reasoning. Emails a ready-to-use shortlist — a human still supplies the real fact each draft needs and creates the topic.', schedule: 'Daily', toggleable: true, configurable: true },
+      { id: 'on_page_seo_agent', name: 'On-Page SEO Agent', description: 'Audits real published pages for on-page factors — title/meta length, single H1, heading hierarchy, image alt coverage, internal links, canonical + schema presence — and emails a prioritized per-page fix list. Advisory only; never edits the live site.', schedule: 'Weekly (Tuesday)', toggleable: true, configurable: true },
+      { id: 'technical_audit_agent', name: 'Technical Audit Agent', description: 'Site-wide technical SEO health from real checks: robots.txt + sitemap.xml, HTTPS, per-page canonical correctness, unique titles/meta, viewport, structured data, and real GSC index-coverage signals. Emails a report. Advisory only.', schedule: 'Weekly (Wednesday)', toggleable: true, configurable: true },
       { id: 'manager_agent', name: 'Manager Agent', description: 'Watches every other agent for stale runs or error spikes — auto-pauses all automation and emails you if something looks broken.', schedule: 'Every 10 minutes' },
     ];
     const agentSettingsMap: Record<string, boolean> = {};
@@ -231,7 +233,7 @@ Deno.serve(async (req) => {
     // a generic switch for agents that don't check agent_settings (content
     // draft / policy guardrail / manager are controlled by the global
     // automation_paused kill-switch only, on purpose).
-    const TOGGLEABLE_AGENTS = ['topic_discovery_agent'];
+    const TOGGLEABLE_AGENTS = ['topic_discovery_agent', 'on_page_seo_agent', 'technical_audit_agent'];
     if (!agentName || !TOGGLEABLE_AGENTS.includes(agentName)) {
       return json({ error: 'This agent cannot be toggled individually.' }, 400);
     }
@@ -256,7 +258,7 @@ Deno.serve(async (req) => {
     // Same reasoning as toggle_agent's whitelist — only agents whose code
     // actually reads agent_settings for these fields (via getAgentConfig)
     // may be configured here.
-    const CONFIGURABLE_AGENTS = ['content_draft_agent', 'policy_guardrail_agent', 'topic_discovery_agent'];
+    const CONFIGURABLE_AGENTS = ['content_draft_agent', 'policy_guardrail_agent', 'topic_discovery_agent', 'on_page_seo_agent', 'technical_audit_agent'];
     if (!agentName || !CONFIGURABLE_AGENTS.includes(agentName)) {
       return json({ error: 'This agent has no configurable settings.' }, 400);
     }

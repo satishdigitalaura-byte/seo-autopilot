@@ -10,7 +10,9 @@
     "watcher:run": "node src/runners/runGscGa4Watcher.js",
     "audit:run": "node src/runners/runSeoAudit.js",
     "manager:run": "node src/runners/runManager.js",
-    "topic-discovery:run": "node src/runners/runTopicDiscovery.js"
+    "topic-discovery:run": "node src/runners/runTopicDiscovery.js",
+    "onpage:run": "node src/runners/runOnPageSeo.js",
+    "techaudit:run": "node src/runners/runTechnicalAudit.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
