@@ -5,6 +5,7 @@ import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell } from '../lib/emailTemplate.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
+import { generateAndInsertImages } from '../lib/imageInserter.js';
 
 /**
  * Content Draft Agent — writes a blog/page draft with Gemini, then hands it to
@@ -264,6 +265,26 @@ Return ONLY a JSON object, no other text:
       .replace(/\s*style\s*=\s*'[^']*'/gi, '');
   }
 
+  // Generate real images for the placements the model suggested (free tier,
+  // Cloudflare Workers AI) and embed them directly in the HTML, right after
+  // their matching heading. Never blocks the draft — a failed/missing image
+  // just leaves that section without one rather than failing the whole task.
+  let imagesGenerated = 0;
+  if (draft.contentHtml && Array.isArray(draft.imagePlacements) && draft.imagePlacements.length) {
+    try {
+      const imgResult = await generateAndInsertImages({
+        contentHtml: draft.contentHtml,
+        imagePlacements: draft.imagePlacements,
+        topic,
+        siteName: site?.name,
+      });
+      draft.contentHtml = imgResult.html;
+      imagesGenerated = imgResult.generatedCount;
+    } catch (err) {
+      console.warn('Image generation step failed entirely (non-fatal, draft continues without images):', err.message);
+    }
+  }
+
   const authorSchema = p.authorName
     ? { '@type': 'Person', name: p.authorName, ...(p.authorCredentials ? { jobTitle: p.authorCredentials } : {}), description: draft.authorBio }
     : { '@type': 'Organization', name: site?.name || 'Digital Aura', description: draft.authorBio };
@@ -316,6 +337,7 @@ Return ONLY a JSON object, no other text:
       keywordResearch,
       internalLinkCandidatesOffered: internalLinkCandidates.length,
       imagePlacements: draft.imagePlacements || [],
+      imagesGenerated,
     },
   });
 
