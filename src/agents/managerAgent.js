@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { pauseAutomation } from '../lib/systemStatus.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell } from '../lib/emailTemplate.js';
+import { sendPushNotification } from '../lib/pushClient.js';
 
 /**
  * The Manager Agent — a team lead for the other agents, not a content agent
@@ -152,6 +153,10 @@ export async function runManagerCheck() {
     const reason = problems.map((p) => `[${p.type}] ${p.agent}: ${p.detail}`).join(' | ');
     await pauseAutomation(reason, 'manager_agent');
     await sendAlertEmail(problems);
+    await sendPushNotification({
+      title: 'SEO Autopilot paused itself',
+      body: `${problems.length} problem(s) found — ${problems[0]?.detail || ''}`,
+    });
     await supabase.from('agent_results').insert({ agent_name: 'manager_agent', result: { decision: 'paused', problems } });
     await supabase.from('event_log').insert({ actor: 'manager_agent', action: 'paused_automation', details: { problems } });
     return { decision: 'paused', problems };

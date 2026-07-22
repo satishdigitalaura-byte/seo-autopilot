@@ -604,6 +604,40 @@ async function showApp() {
   }
   renderGreeting();
   await loadData();
+  initPushNotifications();
+}
+
+// Desktop push — mirrors the critical-only alerts that still email (automation
+// paused, real traffic drops). Reaches the desktop even with this tab closed,
+// once the browser has granted permission and a subscription is saved.
+const VAPID_PUBLIC_KEY = 'BFLeWQZdjsHwz3nb9YuYKeidc-S55gx8_EyXrMKLMk5NEfE1HLPYnEkZKd0D7P5T8KkVmKiMRbz6XdWhg9h9A3Y';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function initPushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    let permission = Notification.permission;
+    if (permission === 'default') permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await callPanelApi({ action: 'save_push_subscription', subscription: sub.toJSON() });
+  } catch (err) {
+    console.warn('Push notification setup failed (non-fatal):', err.message);
+  }
 }
 
 function renderGreeting() {

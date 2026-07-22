@@ -3,6 +3,7 @@ import { getPageClicks } from '../lib/gscClient.js';
 import { getPageSessions } from '../lib/ga4Client.js';
 import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell, renderBeforeAfterBars } from '../lib/emailTemplate.js';
+import { sendPushNotification } from '../lib/pushClient.js';
 
 /**
  * GSC/GA4 Watcher Agent — per SEO_AUTOPILOT_MASTER_ARCHITECTURE.md §2/§3.
@@ -195,6 +196,11 @@ export async function runWatcherForSite(site) {
     } catch (err) {
       console.warn('Email notification failed (non-fatal):', err.message);
     }
+
+    await sendPushNotification({
+      title: `${site.domain} — traffic dropped`,
+      body: `${findings.length} page(s) lost significant traffic. ${tasksCreated} investigation task(s) queued.`,
+    });
   }
 
   return { site: site.domain, pagesChecked: pages.size, findings: findings.length, tasksCreated, suppressed: false };

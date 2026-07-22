@@ -230,6 +230,26 @@ Deno.serve(async (req) => {
     return json({ ok: true, task: data[0], immediate: dispatched });
   }
 
+  if (action === 'save_push_subscription') {
+    // Any logged-in panel account (admin or viewer) can register their own
+    // browser for desktop push — this only ever sends critical alerts
+    // (automation paused, real traffic drops), same set that still emails.
+    const { user } = await getCaller(req);
+    if (!user?.email) return json({ error: 'Not logged in.' }, 401);
+
+    const { subscription } = body as { subscription?: { endpoint?: string; keys?: Record<string, string> } };
+    if (!subscription?.endpoint || !subscription?.keys) {
+      return json({ error: 'subscription.endpoint and subscription.keys are required' }, 400);
+    }
+    const { error } = await supabase.from('push_subscriptions').upsert({
+      user_email: user.email,
+      endpoint: subscription.endpoint,
+      keys: subscription.keys,
+    }, { onConflict: 'endpoint' });
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
+  }
+
   if (action === 'toggle_agent') {
     const { isAdmin, user: caller } = await getCaller(req);
     if (!isAdmin) return json({ error: 'Only admins can turn agents on or off.' }, 403);
