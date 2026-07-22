@@ -3,8 +3,6 @@ import { generateText } from '../lib/llmClient.js';
 import { getStrikingDistanceQueries, getContentGapQueries, getQueryMovement } from '../lib/gscClient.js';
 import { getKeywordIdeas } from '../lib/googleAdsClient.js';
 import { scoreKeywords, clusterKeywords } from '../lib/keywordStrategy.js';
-import { sendNotificationEmail } from '../lib/emailClient.js';
-import { renderEmailShell } from '../lib/emailTemplate.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
 
 /**
@@ -323,67 +321,9 @@ ${raw.slice(0, 16000)}`;
     details: { picksCount: picks.length },
   });
 
-  if (picks.length > 0) {
-    try {
-      const clusters = digest.keywordClusters || [];
-      // Short "clusters found" summary near the top — real cluster names + their
-      // top 2-3 real keywords, so the reader sees the thematic map at a glance.
-      const clustersSummaryHtml = clusters.length ? `
-        <div style="margin:0 0 18px;padding:12px 14px;background:#F8FAFF;border:1px solid #E5E7EB;border-radius:8px;">
-          <div style="font-size:12px;font-weight:700;color:#0A1628;margin-bottom:6px;">Keyword clusters found (${clusters.length})</div>
-          ${clusters.map((c) => `
-            <div style="font-size:12px;color:#374151;margin-bottom:3px;"><span style="font-weight:600;color:#1A6FE8;">${c.clusterName}</span>: ${(c.keywords || []).slice(0, 3).map((kw) => `"${kw}"`).join(', ')}</div>
-          `).join('')}
-        </div>` : '';
-
-      // Per-pick: story angles as a small bulleted list, and a one-line stat row
-      // with the real derived difficulty / opportunity / trend / cluster.
-      const anglesHtml = (p) => {
-        const angles = Array.isArray(p.storyAngles) ? p.storyAngles.filter((a) => a && a.angle) : [];
-        if (!angles.length) return '';
-        return `
-            <div style="font-size:12px;color:#0A1628;font-weight:600;margin:8px 0 4px;">Story angles to consider:</div>
-            <ul style="margin:0 0 6px;padding-left:18px;">
-              ${angles.map((a) => `<li style="font-size:12px;color:#374151;margin-bottom:3px;">${a.angle}${a.whyItWorks ? ` <span style="color:#6B7280;">— ${a.whyItWorks}</span>` : ''}</li>`).join('')}
-            </ul>`;
-      };
-      const statsRow = (p) => {
-        const parts = [];
-        if (p.keywordDifficulty !== null && p.keywordDifficulty !== undefined) parts.push(`Difficulty ${p.keywordDifficulty}/100`);
-        if (p.opportunityScore !== null && p.opportunityScore !== undefined) parts.push(`Opportunity ${p.opportunityScore}/100`);
-        if (p.demandTrend) parts.push(`Demand ${p.demandTrend}`);
-        if (p.clusterName) parts.push(`Cluster: ${p.clusterName}`);
-        return parts.length ? `<div style="font-size:11px;color:#6B7280;margin-bottom:6px;">${parts.join(' &middot; ')}</div>` : '';
-      };
-
-      const bodyHtml = `
-        <p style="margin-bottom:16px;">${analysis.overallStrategyNote || ''}</p>
-        ${clustersSummaryHtml}
-        ${picks.map((p, i) => `
-          <div style="margin-bottom:18px;padding-bottom:18px;${i < picks.length - 1 ? 'border-bottom:1px solid #E5E7EB;' : ''}">
-            <div style="font-size:13px;font-weight:700;color:#0A1628;margin-bottom:4px;">${i + 1}. ${p.suggestedTitle || p.targetKeyword} <span style="font-weight:400;color:#6B7280;">(priority ${p.priorityScore}/10)</span></div>
-            <div style="font-size:12px;color:#6B7280;margin-bottom:6px;">Target: "${p.targetKeyword}" &middot; ${p.contentType === 'refresh_existing' ? `Refresh existing page: ${p.existingPage || ''}` : 'New page'} &middot; ${p.opportunityType}</div>
-            ${statsRow(p)}
-            <div style="font-size:13px;color:#374151;margin-bottom:6px;">${p.strategicReasoning || ''}</div>
-            ${anglesHtml(p)}
-            <div style="font-size:12px;color:#FF6B2B;">Needs from you: ${p.realFactNeeded || 'a real client fact/case-study number'}</div>
-          </div>
-        `).join('')}
-        <p style="margin-top:8px;color:#6B7280;font-size:12px;">To turn any of these into an actual draft, use "Create Topic" in the panel with the target keyword above and your own real fact — this agent finds and prioritizes topics, but a human always supplies the genuine detail every draft is required to have. The story angles above are only framing ideas for that real fact — they don't invent any result.</p>
-      `;
-      await sendNotificationEmail({
-        subject: `[Topic Ideas] ${site.domain} — ${picks.length} ranked opportunit${picks.length === 1 ? 'y' : 'ies'} found`,
-        html: renderEmailShell({
-          badgeLabel: 'New Topic Suggestions',
-          badgeTone: 'good',
-          heading: `${picks.length} SEO opportunit${picks.length === 1 ? 'y' : 'ies'} for ${site.domain}`,
-          bodyHtml,
-        }),
-      });
-    } catch (err) {
-      console.warn('Topic discovery notification email failed (non-fatal):', err.message);
-    }
-  }
+  // Not critical — the full topPicks/story-angles/reasoning are already saved
+  // in agent_results above and rendered as a notification card in the panel's
+  // Activity feed, so no email is sent for routine topic suggestions.
 
   return { site: site.domain, decision: 'suggestions_ready', picksCount: picks.length };
 }

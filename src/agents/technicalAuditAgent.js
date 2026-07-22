@@ -2,8 +2,6 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { generateText } from '../lib/llmClient.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
 import { getPageClicks } from '../lib/gscClient.js';
-import { sendNotificationEmail } from '../lib/emailClient.js';
-import { renderEmailShell } from '../lib/emailTemplate.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
 
 /**
@@ -196,10 +194,8 @@ export async function runTechnicalAuditForSite(site) {
     result,
   });
 
-  await sendNotificationEmail({
-    subject: `[Technical Audit] ${siteDomain} — ${issues.length} issue(s) found`,
-    html: buildEmail(site, result),
-  });
+  // Not critical — routine weekly report, already saved above and rendered
+  // as a notification card in the panel's Activity feed, no email sent.
 
   try {
     await supabase.from('event_log').insert({
@@ -244,50 +240,3 @@ ${issuesBlock}`;
   }
 }
 
-function buildEmail(site, r) {
-  const yn = (b) => (b ? '<span style="color:#22C55E;">yes</span>' : '<span style="color:#EF4444;">no</span>');
-
-  const summaryHtml = r.summary
-    ? `<div style="background:#F8FAFF;border-radius:10px;padding:14px 16px;margin:0 0 20px;font-size:13px;color:#374151;line-height:1.6;white-space:pre-wrap;">${r.summary}</div>`
-    : '';
-
-  const issuesHtml = r.issues.length
-    ? `<ul style="margin:6px 0 20px;padding-left:18px;color:#374151;font-size:13px;line-height:1.6;">${r.issues.map((i) => `<li style="margin-bottom:5px;">${i}</li>`).join('')}</ul>`
-    : `<p style="color:#22C55E;font-size:13px;">No technical issues found — all checks passed.</p>`;
-
-  const pageRows = r.pages.map((p) => {
-    const path = p.url.replace(/^https?:\/\/[^/]+/, '') || '/';
-    return `<tr>
-      <td style="padding:6px 10px;border-bottom:1px solid #E5E7EB;font-size:12px;word-break:break-all;">${path}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #E5E7EB;font-size:12px;text-align:center;">${yn(p.isHttps)}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #E5E7EB;font-size:12px;text-align:center;">${p.canonicalBug ? '<span style="color:#EF4444;">wrong</span>' : yn(!!p.canonical)}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #E5E7EB;font-size:12px;text-align:center;">${yn(p.hasViewport)}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #E5E7EB;font-size:12px;text-align:center;">${yn(p.hasJsonLd)}</td>
-    </tr>`;
-  }).join('');
-
-  const bodyHtml = `
-    <p style="color:#6B7280;font-size:13px;">${r.issueCount} issue(s) found across ${r.pagesChecked} page(s). Advisory only — nothing was changed on your site.</p>
-    ${summaryHtml}
-    <h3 style="color:#0A1628;font-size:15px;margin:20px 0 8px;">Site-wide checks</h3>
-    <ul style="margin:6px 0 16px;padding-left:18px;color:#374151;font-size:13px;line-height:1.7;">
-      <li>robots.txt present: ${yn(r.robots.present)}</li>
-      <li>sitemap.xml present: ${yn(r.sitemap.present)} ${r.sitemap.present ? `(${r.sitemap.urlCount} URLs)` : ''}</li>
-      <li>Per-page unique titles/meta: ${r.duplicateMeta ? '<span style="color:#EF4444;">duplicate detected (SPA meta bug)</span>' : yn(true)}</li>
-      <li>GSC pages with search data: ${r.gscIndex.available ? r.gscIndex.pagesWithData : 'n/a (no gsc_property credential)'}</li>
-    </ul>
-    <h3 style="color:#0A1628;font-size:15px;margin:20px 0 8px;">All issues</h3>
-    ${issuesHtml}
-    <h3 style="color:#0A1628;font-size:15px;margin:20px 0 8px;">Per-page technical checks</h3>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-      <tr>${['Page', 'HTTPS', 'Canonical', 'Viewport', 'Schema'].map((h) => `<th style="text-align:${h === 'Page' ? 'left' : 'center'};padding:6px 10px;font-size:11px;color:#6B7280;text-transform:uppercase;border-bottom:2px solid #0A1628;">${h}</th>`).join('')}</tr>
-      ${pageRows}
-    </table>`;
-
-  return renderEmailShell({
-    badgeLabel: 'Technical Audit',
-    badgeTone: r.issueCount === 0 ? 'good' : 'warning',
-    heading: `${site.domain} — Technical SEO Audit`,
-    bodyHtml,
-  });
-}

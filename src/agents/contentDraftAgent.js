@@ -2,8 +2,6 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { generateText } from '../lib/llmClient.js';
 import { researchKeywords } from '../lib/keywordResearch.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
-import { sendNotificationEmail } from '../lib/emailClient.js';
-import { renderEmailShell } from '../lib/emailTemplate.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
 import { generateAndInsertImages } from '../lib/imageInserter.js';
 import { getTemplateGuidance, isValidBlogType } from '../lib/contentTemplates.js';
@@ -47,26 +45,14 @@ export async function processContentDraftTask(task) {
   // did) created an infinite content_draft_agent <-> policy_guardrail_agent
   // ping-pong loop, since neither agent can ever supply the missing fact.
   if (!p.originalElement || !String(p.originalElement).trim()) {
+    // Not a critical failure — surfaced in the panel's Activity feed via this
+    // task's status/error_message, not email (routine input-needed cases
+    // don't need to interrupt an inbox; see the panel's notification gating).
     await supabase.from('agent_tasks').update({
       status: 'failed',
       error_message: 'No originalElement (client data point / case-study figure / firsthand fact) supplied — required before drafting (Guidelines §6).',
       completed_at: new Date().toISOString(),
     }).eq('id', task.id);
-
-    try {
-      const { data: site } = await supabase.from('sites').select('domain').eq('id', task.site_id).single();
-      await sendNotificationEmail({
-        subject: `[Input needed] Original element missing — ${topic || 'untitled topic'} (${site?.domain || ''})`,
-        html: renderEmailShell({
-          badgeLabel: 'Input Needed',
-          badgeTone: 'warning',
-          heading: topic || 'A blog topic needs a real fact',
-          bodyHtml: `<p>This topic can't be drafted yet — it needs one genuine, original detail (a real client data point, case-study figure, or firsthand fact) before the agent can write it, per the anti-scaled-content-abuse guideline.</p><p style="margin-top:12px;color:#6B7280;">Site: ${site?.domain || 'unknown'}<br/>Task ID: ${task.id}</p>`,
-        }),
-      });
-    } catch (err) {
-      console.warn('Original-element notification email failed (non-fatal):', err.message);
-    }
 
     return { decision: 'blocked_no_original_element' };
   }
@@ -237,25 +223,14 @@ Return ONLY a JSON object, no other text:
     try {
       ({ text: raw, parsed: draft } = await generateDraft());
     } catch (secondErr) {
+      // Not a critical failure — visible in the panel's Activity feed via
+      // this task's status/error_message instead of email (routine model
+      // hiccup, not something that needs to interrupt an inbox).
       await supabase.from('agent_tasks').update({
         status: 'failed',
         error_message: 'Model did not return valid JSON, even after one retry',
         completed_at: new Date().toISOString(),
       }).eq('id', task.id);
-      try {
-        const { data: siteForEmail } = await supabase.from('sites').select('domain').eq('id', task.site_id).single();
-        await sendNotificationEmail({
-          subject: `[Draft failed] ${topic || 'untitled topic'} (${siteForEmail?.domain || ''})`,
-          html: renderEmailShell({
-            badgeLabel: 'Draft Failed',
-            badgeTone: 'alert',
-            heading: topic || 'A draft could not be generated',
-            bodyHtml: `<p>The AI model returned invalid output twice in a row for this topic, so this attempt was abandoned rather than retried indefinitely. Try creating the topic again from the panel — this is usually a one-off model glitch, not a problem with the topic itself.</p><p style="margin-top:12px;color:#6B7280;">Site: ${siteForEmail?.domain || 'unknown'}<br/>Task ID: ${task.id}</p>`,
-          }),
-        });
-      } catch (emailErr) {
-        console.warn('Draft-failed notification email failed (non-fatal):', emailErr.message);
-      }
       return { decision: 'failed_parse', raw: (raw || '').slice(0, 400) };
     }
   }

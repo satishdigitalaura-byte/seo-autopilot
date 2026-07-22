@@ -1,8 +1,6 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { generateText } from '../lib/llmClient.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
-import { sendNotificationEmail } from '../lib/emailClient.js';
-import { renderEmailShell } from '../lib/emailTemplate.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
 
 /**
@@ -183,10 +181,8 @@ export async function runOnPageAuditForSite(site) {
     result,
   });
 
-  await sendNotificationEmail({
-    subject: `[On-Page SEO] ${siteDomain} — avg score ${avgScore}/100 across ${pages.length} pages`,
-    html: buildEmail(site, result),
-  });
+  // Not critical — routine weekly report, already saved above and rendered
+  // as a notification card in the panel's Activity feed, no email sent.
 
   try {
     await supabase.from('event_log').insert({
@@ -235,43 +231,3 @@ ${findingsBlock}`;
   }
 }
 
-function buildEmail(site, r) {
-  const cell = (c, extra = '') => `<td style="padding:6px 10px;border-bottom:1px solid #E5E7EB;font-size:13px;${extra}">${c}</td>`;
-  const scoreColor = (s) => (s >= 80 ? '#22C55E' : s >= 50 ? '#FF6B2B' : '#EF4444');
-
-  const pageBlocks = r.pages.map((p) => {
-    const path = p.url.replace(/^https?:\/\/[^/]+/, '') || '/';
-    const issues = p.findings.length
-      ? `<ul style="margin:6px 0 0;padding-left:18px;color:#374151;font-size:12px;">${p.findings.map((f) => `<li style="margin-bottom:3px;">${f}</li>`).join('')}</ul>`
-      : `<p style="margin:6px 0 0;color:#22C55E;font-size:12px;">No issues found — this page passes all on-page checks.</p>`;
-    return `
-      <div style="margin-bottom:16px;padding:12px 14px;border:1px solid #E5E7EB;border-radius:10px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-          <td style="font-size:13px;font-weight:600;color:#0A1628;word-break:break-all;">${path}</td>
-          <td style="text-align:right;white-space:nowrap;"><span style="font-size:13px;font-weight:700;color:${scoreColor(p.score)};">${p.score}/100</span></td>
-        </tr></table>
-        <div style="font-size:11px;color:#6B7280;margin-top:4px;">
-          title ${p.titleLen}ch &middot; meta ${p.hasMeta ? p.metaLen + 'ch' : 'missing'} &middot; ${p.h1Count} h1 &middot; ${p.wordCount} words &middot; alt ${p.altCoverage}% &middot; ${p.internalLinks} internal links &middot; canonical ${p.hasCanonical ? 'yes' : 'no'} &middot; schema ${p.hasJsonLd ? 'yes' : 'no'}
-        </div>
-        ${issues}
-      </div>`;
-  }).join('');
-
-  const summaryHtml = r.summary
-    ? `<div style="background:#F8FAFF;border-radius:10px;padding:14px 16px;margin:0 0 20px;font-size:13px;color:#374151;line-height:1.6;white-space:pre-wrap;">${r.summary}</div>`
-    : '';
-
-  const bodyHtml = `
-    <p style="color:#6B7280;font-size:13px;">Audited ${r.pagesAudited} live page(s) &middot; average on-page score <strong style="color:${scoreColor(r.averageScore)};">${r.averageScore}/100</strong> &middot; ${r.totalIssues} total issue(s) found.</p>
-    ${summaryHtml}
-    <h3 style="color:#0A1628;font-size:15px;margin:20px 0 8px;">Per-page findings</h3>
-    <p style="color:#6B7280;font-size:12px;margin:0 0 12px;">Every number below was read directly from the page's live HTML. Advisory only — nothing was changed on your site.</p>
-    ${pageBlocks}`;
-
-  return renderEmailShell({
-    badgeLabel: 'On-Page SEO',
-    badgeTone: r.averageScore >= 80 ? 'good' : 'warning',
-    heading: `${site.domain} — On-Page SEO Report`,
-    bodyHtml,
-  });
-}

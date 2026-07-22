@@ -1,10 +1,7 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { runRuleChecks } from '../rules/guidelinesRuleset.js';
 import { generateText } from '../lib/llmClient.js';
-import { sendNotificationEmail } from '../lib/emailClient.js';
-import { renderEmailShell, renderApprovalButtons } from '../lib/emailTemplate.js';
 import { sendSlackApproval } from '../lib/slackClient.js';
-import { approveUrl } from '../lib/approvalLinks.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
 
 async function runQualitativeCheck(payload, agentConfig) {
@@ -160,32 +157,9 @@ export async function processGuardrailTask(task) {
   }).select();
   const reviewTask = reviewTaskRows?.[0];
 
-  try {
-    const bodyHtml = `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
-        <tr><td style="padding:4px 0;color:#6B7280;width:120px;">Site</td><td style="padding:4px 0;font-weight:600;">${site?.domain || 'unknown'}</td></tr>
-        <tr><td style="padding:4px 0;color:#6B7280;">Slug</td><td style="padding:4px 0;">${task.payload.slug || '(no slug)'}</td></tr>
-        <tr><td style="padding:4px 0;color:#6B7280;">Keyword</td><td style="padding:4px 0;">${task.payload.targetKeyword || ''}</td></tr>
-        <tr><td style="padding:4px 0;color:#6B7280;vertical-align:top;">Why written</td><td style="padding:4px 0;">${task.payload.triggerReason || ''}</td></tr>
-      </table>
-      <p style="margin-top:16px;padding:12px 16px;background:#F8FAFF;border-radius:8px;color:#374151;">${task.payload.excerpt || ''}</p>
-      ${resultSummary.forcedToHumanAfterRevisions ? `<p style="margin-top:16px;padding:12px 16px;background:#FFF7ED;border-radius:8px;color:#9A3412;"><strong>Note:</strong> this draft was rejected ${revisionCount} time(s) — ${onlyContentLengthFails ? 'it kept coming in shorter than the required word count' : 'the AI quality-checker judged it too generic'} — and still isn't fully satisfied. It's being sent to you directly instead of looping forever. Please read it a bit more carefully than usual before approving.</p>` : ''}
-      <p style="margin-top:16px;font-size:13px;color:#6B7280;">This is not live yet &mdash; nothing publishes until a human approves it.</p>
-      ${reviewTask ? renderApprovalButtons({ approveHref: approveUrl(reviewTask.id, 'approve'), rejectHref: approveUrl(reviewTask.id, 'reject') }) : ''}
-    `;
-
-    await sendNotificationEmail({
-      subject: `[Review needed] ${task.payload.title || task.payload.targetKeyword || 'New draft'} — ${site?.domain || ''}`,
-      html: renderEmailShell({
-        badgeLabel: 'Review Needed',
-        badgeTone: 'info',
-        heading: task.payload.title || '(no title)',
-        bodyHtml,
-      }),
-    });
-  } catch (err) {
-    console.warn('Email notification failed (non-fatal):', err.message);
-  }
+  // Not critical — every draft lands in the panel's Pending Approvals queue
+  // (with a preview) the moment this task is created, so no email per draft;
+  // Slack still fires below for a quick heads-up without inbox noise.
 
   try {
     if (reviewTask) {

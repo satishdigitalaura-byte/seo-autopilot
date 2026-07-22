@@ -134,19 +134,8 @@ export async function runWatcherForSite(site) {
   });
 
   if (isSuppressed) {
-    try {
-      await sendNotificationEmail({
-        subject: `[SEO Watcher] ${site.domain} — alerts paused (Google core update in progress)`,
-        html: renderEmailShell({
-          badgeLabel: 'Paused',
-          badgeTone: 'info',
-          heading: `${site.domain} — alerts paused`,
-          bodyHtml: `<p>A Google core/spam update is currently rolling out, so ranking volatility is expected and not a site-specific issue. Watcher data was still logged, but alert tasks were skipped for this run.</p>`,
-        }),
-      });
-    } catch (err) {
-      console.warn('Email notification failed (non-fatal):', err.message);
-    }
+    // Not critical — visible as a notification card in the panel (result
+    // above already records suppressed:true), no email for a routine pause.
     return { site: site.domain, pagesChecked: pages.size, findings: findings.length, tasksCreated: 0, suppressed: true };
   }
 
@@ -176,8 +165,11 @@ export async function runWatcherForSite(site) {
     details: { pagesChecked: pages.size, findingsCount: findings.length, tasksCreated },
   });
 
-  try {
-    if (findings.length > 0) {
+  // CRITICAL — real, current traffic loss is the one case in this agent that
+  // genuinely needs an inbox interruption, not just a panel notification.
+  // The "all clear" case is routine and stays panel-only (see agent_results above).
+  if (findings.length > 0) {
+    try {
       const barsHtml = renderBeforeAfterBars(
         findings.slice(0, 10).map((f) => ({
           label: `${f.url} — ${f.changePct}% (position ${f.positionBefore} → ${f.positionAfter})`,
@@ -200,19 +192,9 @@ export async function runWatcherForSite(site) {
           `,
         }),
       });
-    } else {
-      await sendNotificationEmail({
-        subject: `[SEO Watcher] ${site.domain} — all clear, no traffic drops`,
-        html: renderEmailShell({
-          badgeLabel: 'All Clear',
-          badgeTone: 'good',
-          heading: `${site.domain} — no issues found`,
-          bodyHtml: `<p>Checked <strong>${pages.size} pages</strong> for the last 7 days vs. the prior 7 days. No significant traffic drops found. Nothing needs attention today.</p>`,
-        }),
-      });
+    } catch (err) {
+      console.warn('Email notification failed (non-fatal):', err.message);
     }
-  } catch (err) {
-    console.warn('Email notification failed (non-fatal):', err.message);
   }
 
   return { site: site.domain, pagesChecked: pages.size, findings: findings.length, tasksCreated, suppressed: false };

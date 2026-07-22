@@ -196,6 +196,27 @@
   button.reject { background: var(--red); color: #fff; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 12.5px; }
   button.approve:hover { background: #16a34a; } button.reject:hover { background: #dc2626; }
   .empty { color: var(--gray); font-size: 13px; padding: 8px 0; }
+  button.preview-btn { background: #fff; color: var(--dark); border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; margin-right: 8px; font-size: 12.5px; }
+  button.preview-btn:hover { background: var(--bg); }
+
+  .preview-modal-box { max-width: 900px; width: 92vw; height: 88vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+  .preview-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .preview-modal-meta { font-size: 11.5px; color: var(--gray); margin-top: 4px; max-width: 640px; }
+  .preview-close-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+  .preview-modal-frame { flex: 1; width: 100%; border: none; background: #fff; }
+
+  .notif-card { border-bottom: 1px solid var(--border); padding: 14px 0; }
+  .notif-card:last-child { border-bottom: none; }
+  .notif-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .notif-badge { font-size: 10.5px; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+  .notif-badge.good { background: #DCFCE7; color: #15803D; }
+  .notif-badge.warning { background: #FEF3C7; color: #92400E; }
+  .notif-badge.alert { background: #FEE2E2; color: #B91C1C; }
+  .notif-badge.info { background: #DBEAFE; color: #1D4ED8; }
+  .notif-title { font-weight: 700; font-size: 13.5px; color: var(--dark); }
+  .notif-time { font-size: 11px; color: var(--gray); margin-left: auto; white-space: nowrap; }
+  .notif-body { font-size: 12.5px; color: #374151; line-height: 1.6; }
+  .notif-body ul { margin: 4px 0; padding-left: 18px; }
 
   /* Timeline */
   .filter-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -210,6 +231,7 @@
   .tl-dot.rejected, .tl-dot.failed { background: var(--red); }
   .tl-main { flex: 1; min-width: 0; }
   .tl-type { font-weight: 700; font-size: 13px; color: var(--dark); }
+  .tl-error { font-size: 11.5px; color: #B91C1C; margin-top: 2px; }
   .tl-site { color: var(--gray); font-weight: 500; }
   .tl-time { font-size: 11px; color: var(--gray-light); margin-top: 1px; }
   .badge { padding: 3px 10px; border-radius: 20px; font-size: 10.5px; font-weight: 700; display: inline-block; white-space: nowrap; }
@@ -416,6 +438,10 @@
       <!-- ===== ACTIVITY TAB ===== -->
       <div class="tab-panel" data-tab="activity">
         <div class="page-title">Recent Activity</div>
+        <div class="card" id="notifications-card">
+        <div class="card-head"><div><span class="eyebrow">Findings</span><h2>Notifications</h2></div></div>
+        <div id="notifications-list"><div class="empty">Loading…</div></div>
+        </div>
         <div class="card" id="recent-card">
         <div class="card-head"><div><span class="eyebrow">Timeline</span><h2>All activity</h2></div></div>
         <div class="filter-tabs" id="filter-tabs"></div>
@@ -457,6 +483,19 @@
       <button type="button" onclick="closeAgentSettings()" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-weight:700;cursor:pointer;">Cancel</button>
     </div>
     <div id="agent-settings-status" class="status-msg"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="preview-modal">
+  <div class="modal-box preview-modal-box">
+    <div class="preview-modal-head">
+      <div>
+        <h3 id="preview-modal-title" style="margin:0;">Preview</h3>
+        <div id="preview-modal-meta" class="preview-modal-meta"></div>
+      </div>
+      <button type="button" onclick="closePreview()" class="preview-close-btn">✕ Close</button>
+    </div>
+    <iframe id="preview-modal-frame" class="preview-modal-frame" sandbox=""></iframe>
   </div>
 </div>
 
@@ -597,6 +636,7 @@ async function loadData() {
   renderPending(data.pending || []);
   renderFilterTabs();
   renderRecent();
+  renderNotifications(data.notifications || []);
   renderSites(data.sites || []);
   loadUsers();
 }
@@ -809,26 +849,129 @@ window.saveAgentSettings = async function () {
   }
 };
 
+let previewMap = {};
+
 function renderPending(items) {
   const el = document.getElementById('pending-list');
+  previewMap = {};
   if (!items.length) {
     el.innerHTML = `<div class="empty-state"><div class="ic">✓</div><b>Inbox zero</b><p>No drafts waiting for approval right now.</p></div>`;
     return;
   }
   const isAdmin = callerRole === 'admin';
-  el.innerHTML = items.map(t => `
+  el.innerHTML = items.map(t => {
+    previewMap[t.id] = t.payload || {};
+    return `
     <div class="draft-item">
       <div class="draft-title">${escapeHtml(t.payload?.title || '(no title)')}</div>
       <div class="draft-meta">${escapeHtml(t.sites?.domain || '')} · ${new Date(t.created_at).toLocaleString()}</div>
       <div class="draft-excerpt">${escapeHtml(t.payload?.excerpt || '')}</div>
+      <button class="preview-btn" onclick="openPreview('${t.id}')">👁 Preview page</button>
       ${isAdmin ? `
         <button class="approve" onclick="handleApprove('${t.id}')">✅ Approve &amp; Publish as Draft</button>
         <button class="reject" onclick="handleReject('${t.id}')">❌ Reject</button>
       ` : `<div class="viewer-note">View-only account — ask an admin to approve or reject.</div>`}
       <div id="status-${t.id}" class="status-msg"></div>
     </div>
+  `;
+  }).join('');
+}
+
+// Turns an agent_results row into a readable notification card — this is
+// the panel's replacement for the routine emails that used to carry this
+// same data (topic ideas, audit reports, watcher status, etc). Critical
+// events (automation paused, real traffic drops) still also email.
+function summarizeNotification(n) {
+  const r = n.result || {};
+  switch (n.agent_name) {
+    case 'topic_discovery_agent':
+      if (r.decision !== 'suggestions_ready' || !r.topPicks?.length) return null;
+      return {
+        badge: 'good', title: `${r.topPicks.length} new topic idea${r.topPicks.length === 1 ? '' : 's'} found`,
+        body: `<ul>${r.topPicks.map(p => `<li><b>${escapeHtml(p.suggestedTitle || p.targetKeyword)}</b> — priority ${p.priorityScore}/10 · ${escapeHtml(p.opportunityType || '')}</li>`).join('')}</ul>`,
+      };
+    case 'technical_audit_agent':
+      return {
+        badge: r.issueCount === 0 ? 'good' : 'warning', title: `Technical audit — ${r.issueCount ?? 0} issue(s) across ${r.pagesChecked ?? 0} pages`,
+        body: r.summary ? `<p>${escapeHtml(r.summary)}</p>` : (r.issues?.length ? `<ul>${r.issues.slice(0, 6).map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''),
+      };
+    case 'on_page_seo_agent':
+      return {
+        badge: (r.averageScore ?? 0) >= 80 ? 'good' : 'warning', title: `On-page SEO — avg score ${r.averageScore ?? '?'}/100 across ${r.pagesAudited ?? 0} pages`,
+        body: r.summary ? `<p>${escapeHtml(r.summary)}</p>` : '',
+      };
+    case 'seo_audit_agent':
+      return {
+        badge: 'info', title: `SEO audit — ${r.strikingDistance?.length ?? 0} striking-distance opportunities`,
+        body: `<p>${r.underperformingCtr?.length ?? 0} pages with below-expected CTR · ${r.contentGapCount ?? 0} content gaps found.</p>`,
+      };
+    case 'gsc_ga4_watcher':
+      if (r.suppressed) return { badge: 'info', title: 'Watcher paused — Google core update in progress', body: '' };
+      return {
+        badge: r.findingsCount > 0 ? 'warning' : 'good',
+        title: r.findingsCount > 0 ? `${r.findingsCount} page(s) lost significant traffic` : 'All clear — no traffic drops',
+        body: r.findingsCount > 0 ? `<ul>${(r.findings || []).slice(0, 5).map(f => `<li>${escapeHtml(f.url)} — ${f.changePct}%</li>`).join('')}</ul>` : '',
+      };
+    case 'content_draft_agent':
+      if (!r.draft) return null;
+      return { badge: 'info', title: `Draft ready: ${escapeHtml(r.draft.title || '(no title)')}`, body: `<p>${(r.imagesGenerated ?? 0)} image(s) generated · ${r.contentLength ?? 0} characters. See Approvals tab to review.</p>` };
+    case 'manager_agent':
+      if (r.decision !== 'paused') return null;
+      return { badge: 'alert', title: 'Automation paused by Manager Agent', body: `<ul>${(r.problems || []).map(p => `<li><b>${escapeHtml(p.agent)}</b> — ${escapeHtml(p.detail)}</li>`).join('')}</ul>` };
+    default:
+      return null;
+  }
+}
+
+function renderNotifications(items) {
+  const el = document.getElementById('notifications-list');
+  const cards = items.map(n => ({ n, s: summarizeNotification(n) })).filter(x => x.s);
+  if (!cards.length) {
+    el.innerHTML = `<div class="empty">No notifications yet.</div>`;
+    return;
+  }
+  el.innerHTML = cards.slice(0, 40).map(({ n, s }) => `
+    <div class="notif-card">
+      <div class="notif-head">
+        <span class="notif-badge ${s.badge}">${s.badge}</span>
+        <span class="notif-title">${s.title}</span>
+        <span class="notif-time">${timeAgoText(n.created_at)}</span>
+      </div>
+      <div class="notif-body">${s.body || ''}</div>
+    </div>
   `).join('');
 }
+
+window.openPreview = function (taskId) {
+  const p = previewMap[taskId];
+  if (!p) return;
+  document.getElementById('preview-modal-title').textContent = p.title || '(no title)';
+  document.getElementById('preview-modal-meta').textContent =
+    `Meta title: ${p.metaTitle || '(none)'} · Meta description: ${p.metaDescription || '(none)'}`;
+  const frame = document.getElementById('preview-modal-frame');
+  const bodyHtml = `
+    <!doctype html><html><head><meta charset="utf-8">
+    <style>
+      body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:760px;margin:24px auto;padding:0 20px;color:#1F2937;line-height:1.65;}
+      h1,h2,h3{color:#0A1628;} img{max-width:100%;border-radius:8px;}
+      .da-stat-callout{background:#F8FAFF;border-left:4px solid #1A6FE8;padding:14px 18px;border-radius:8px;margin:20px 0;font-weight:600;}
+      .da-key-takeaway{background:#FFF7ED;border-radius:8px;padding:14px 18px;margin:20px 0;}
+      .da-pullquote{border-left:4px solid #FF6B2B;padding:10px 18px;margin:20px 0;font-style:italic;color:#374151;}
+      .da-cta-box{background:#0A1628;color:#fff;padding:20px;border-radius:10px;margin:24px 0;text-align:center;}
+      .da-cta-box a{color:#fff;}
+      .da-content-image-figure{margin:20px 0;} .da-content-image-figure figcaption{font-size:13px;color:#6B7280;margin-top:6px;text-align:center;}
+    </style></head><body>
+    <h1>${p.title || ''}</h1>
+    ${p.content || '<p style="color:#EF4444;">No content found in this draft.</p>'}
+    </body></html>`;
+  frame.srcdoc = bodyHtml;
+  document.getElementById('preview-modal').style.display = 'flex';
+};
+
+window.closePreview = function () {
+  document.getElementById('preview-modal').style.display = 'none';
+  document.getElementById('preview-modal-frame').srcdoc = '';
+};
 
 function renderFilterTabs() {
   const counts = { all: allRecent.length, pending: 0, failed: 0, rejected: 0, completed: 0 };
@@ -865,6 +1008,7 @@ function renderRecent() {
       <div class="tl-main">
         <div class="tl-type">${escapeHtml(t.task_type)} <span class="tl-site">· ${escapeHtml(t.sites?.domain || '—')}</span></div>
         <div class="tl-time">${timeAgoText(t.created_at)} · ${new Date(t.created_at).toLocaleString()}</div>
+        ${t.error_message ? `<div class="tl-error">${escapeHtml(t.error_message)}</div>` : ''}
       </div>
       <span class="badge ${t.status}">${escapeHtml(t.status)}</span>
     </div>

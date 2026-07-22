@@ -148,7 +148,13 @@ Deno.serve(async (req) => {
 
     const { role: callerRole } = await getCaller(req);
 
-    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null });
+    // Notifications feed — the panel's replacement for routine emails. Every
+    // agent already writes its findings to agent_results regardless of
+    // whether it also emails, so this costs no extra agent-side work; we
+    // just surface the same data here instead of it only ever reaching an inbox.
+    const notifications = (results || []).slice(0, 60);
+
+    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null, notifications });
   }
 
   if (action === 'pause_automation') {
