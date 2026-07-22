@@ -11,7 +11,10 @@ const MAX_IMAGES_PER_DRAFT = 4;
 // no real connection to the section's specific content.
 function buildImagePrompt({ visualDescription, altText, topic, siteName }) {
   const subject = (visualDescription && visualDescription.trim()) || altText || topic;
-  return `Professional editorial blog illustration for a ${siteName || 'business'} article about "${topic}". Scene: ${subject}. Clean flat design, soft modern color palette, high quality, no text, no words, no letters, no numbers, no logos, no watermark.`;
+  // The model garbles any readable text/numbers/UI it tries to render, and it
+  // reliably tries whenever the scene implies a dashboard/gauge/chart/screen —
+  // so those are called out explicitly, not just covered by a generic "no text".
+  return `Professional editorial blog illustration for a ${siteName || 'business'} article about "${topic}". Scene: ${subject}. Clean flat design, soft modern color palette, high quality, real physical scene with people/places/objects. Strictly avoid: any text, words, letters, numbers, logos, watermark, dashboard, speedometer or gauge/meter graphic, chart, graph, analytics screen, phone or laptop UI, infographic, or data visualization of any kind.`;
 }
 
 /** End-offset (in the original html) right after each <h2>'s closing tag. */
