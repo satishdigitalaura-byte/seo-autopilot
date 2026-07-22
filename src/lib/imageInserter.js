@@ -5,8 +5,13 @@ import { uploadGeneratedImage } from './imageStorage.js';
 // model suggests a long imagePlacements list; well within the free daily quota.
 const MAX_IMAGES_PER_DRAFT = 4;
 
-function buildImagePrompt({ altText, topic, siteName }) {
-  return `Professional editorial blog illustration for a ${siteName || 'business'} article about "${topic}". Subject: ${altText}. Clean flat design, soft modern color palette, high quality, no text, no words, no letters, no numbers, no logos, no watermark.`;
+// visualDescription (a concrete scene tied to that section's real content) is
+// what actually drives the generation — altText is accessibility/SEO copy,
+// not a visual description, so using it alone produced generic images with
+// no real connection to the section's specific content.
+function buildImagePrompt({ visualDescription, altText, topic, siteName }) {
+  const subject = (visualDescription && visualDescription.trim()) || altText || topic;
+  return `Professional editorial blog illustration for a ${siteName || 'business'} article about "${topic}". Scene: ${subject}. Clean flat design, soft modern color palette, high quality, no text, no words, no letters, no numbers, no logos, no watermark.`;
 }
 
 /** End-offset (in the original html) right after each <h2>'s closing tag. */
@@ -73,11 +78,15 @@ export async function generateAndInsertImages({ contentHtml, imagePlacements, to
         continue; // no headings at all to anchor to — genuinely nowhere sensible to put it
       }
 
-      const prompt = buildImagePrompt({ altText: placement.altText, topic, siteName });
+      const prompt = buildImagePrompt({ visualDescription: placement.visualDescription, altText: placement.altText, topic, siteName });
       const buffer = await generateImage(prompt);
       const fileName = (placement.suggestedFileName || 'blog-image.png').replace(/[^a-z0-9.-]/gi, '-');
       const url = await uploadGeneratedImage(buffer, fileName);
-      const imgTag = `<img src="${url}" alt="${String(placement.altText || '').replace(/"/g, '&quot;')}" loading="lazy" class="da-content-image" />`;
+      const altAttr = String(placement.altText || placement.visualDescription || '').replace(/"/g, '&quot;');
+      const caption = String(placement.caption || '').trim();
+      const imgTag = caption
+        ? `<figure class="da-content-image-figure"><img src="${url}" alt="${altAttr}" loading="lazy" class="da-content-image" /><figcaption>${caption.replace(/</g, '&lt;')}</figcaption></figure>`
+        : `<img src="${url}" alt="${altAttr}" loading="lazy" class="da-content-image" />`;
       insertions.push({ position, imgTag });
     } catch (err) {
       console.warn('Image generation/insert failed for one placement (non-fatal):', err.message);
