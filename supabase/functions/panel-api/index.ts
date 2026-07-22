@@ -199,8 +199,8 @@ Deno.serve(async (req) => {
     const { isAdmin } = await getCaller(req);
     if (!isAdmin) return json({ error: 'View-only accounts cannot create new topics.' }, 403);
 
-    const { siteId, topic, originalElement, triggerReason } = body as {
-      siteId?: string; topic?: string; originalElement?: string; triggerReason?: string;
+    const { siteId, topic, originalElement, triggerReason, blogType } = body as {
+      siteId?: string; topic?: string; originalElement?: string; triggerReason?: string; blogType?: string;
     };
     if (!siteId || !topic || !originalElement) {
       return json({ error: 'siteId, topic, and originalElement are all required' }, 400);
@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
       target_agent: 'content_draft_agent',
       task_type: 'draft_new',
       status: 'pending',
-      payload: { topic, originalElement, triggerReason: triggerReason || 'panel_manual_request' },
+      payload: { topic, originalElement, triggerReason: triggerReason || 'panel_manual_request', blogType: blogType || 'general' },
     }).select();
     if (error) return json({ error: error.message }, 500);
 

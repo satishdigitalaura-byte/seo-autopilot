@@ -380,6 +380,13 @@
           <select id="site-select"></select>
           <input id="topic-input" type="text" placeholder="Topic (e.g. 'Local SEO Checklist for Hotels')" />
           <textarea id="original-element-input" placeholder="Real result/fact to base this on (e.g. 'We took a hotel client from page 5 to #1 for jacuzzi suites near me in 3 months — 15,000 extra sessions, 160 monthly bookings')"></textarea>
+          <select id="blog-type-select">
+            <option value="general">Blog type: General / no fixed structure</option>
+            <option value="case_study">Blog type: Case Study (result-led, before/after)</option>
+            <option value="how_to">Blog type: How-To (numbered steps)</option>
+            <option value="comparison">Blog type: Comparison (X vs Y)</option>
+            <option value="listicle">Blog type: Listicle (numbered list)</option>
+          </select>
           <button class="primary" id="create-topic-btn" onclick="createTopic()">Create draft task ▸</button>
           <div id="create-status" class="status-msg"></div>
         </div>
@@ -891,6 +898,7 @@ window.createTopic = async function () {
   const siteId = document.getElementById('site-select').value;
   const topic = document.getElementById('topic-input').value.trim();
   const originalElement = document.getElementById('original-element-input').value.trim();
+  const blogType = document.getElementById('blog-type-select').value;
   const statusEl = document.getElementById('create-status');
   if (!siteId || !topic || !originalElement) {
     statusEl.textContent = 'Please fill in the site, topic, and a real result/fact to write from.';
@@ -900,7 +908,7 @@ window.createTopic = async function () {
   statusEl.textContent = 'Creating…';
   statusEl.className = 'status-msg';
   try {
-    const res = await callPanelApi({ action: 'create_topic', siteId, topic, originalElement });
+    const res = await callPanelApi({ action: 'create_topic', siteId, topic, originalElement, blogType });
     statusEl.textContent = res.immediate
       ? 'Task created — drafting now, check back in ~1-2 minutes.'
       : 'Task created — the agent will draft it on its next scheduled run (within 15 min).';

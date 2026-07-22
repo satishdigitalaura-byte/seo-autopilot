@@ -6,6 +6,7 @@ import { sendNotificationEmail } from '../lib/emailClient.js';
 import { renderEmailShell } from '../lib/emailTemplate.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
 import { generateAndInsertImages } from '../lib/imageInserter.js';
+import { getTemplateGuidance, isValidBlogType } from '../lib/contentTemplates.js';
 
 /**
  * Content Draft Agent — writes a blog/page draft with Gemini, then hands it to
@@ -97,6 +98,8 @@ export async function processContentDraftTask(task) {
     || internalLinkCandidates[0];
 
   const currentYear = new Date().getFullYear();
+  const blogType = isValidBlogType(p.blogType) ? p.blogType : 'general';
+  const templateGuidance = getTemplateGuidance(blogType);
   const isCompetitiveTopic = /best|vs|comparison|guide|checklist|complete/i.test(topic);
   const wordMin = isCompetitiveTopic ? 1800 : 1000;
   const wordTarget = isCompetitiveTopic ? `${wordMin}-2800 (competitive/pillar topic)` : `${wordMin}-1600 (standard topic)`;
@@ -161,6 +164,7 @@ ${linkList}
     - Wrap any direct claim/result quote in <blockquote class="da-pullquote">...</blockquote> instead of a plain <p>.
     - Wrap the final CTA paragraph in <div class="da-cta-box">...</div> instead of a bare <p>.
     - Never use inline style="" or <font> — only these class names, so the site's own CSS controls the actual look.
+${templateGuidance ? `31. CONTENT TYPE STRUCTURE (${blogType.replace('_', ' ')}) — mandatory H2/H3 organization for this piece, on top of every rule above:\n${templateGuidance}` : ''}
 
 TOPIC: ${topic}
 ORIGINAL ELEMENT (the backbone of the article): ${p.originalElement}
@@ -338,6 +342,7 @@ Return ONLY a JSON object, no other text:
     agent_name: 'content_draft_agent',
     result: {
       draft: { ...draft, contentHtml: undefined },
+      blogType,
       contentLength: (draft.contentHtml || '').length,
       keywordResearch,
       internalLinkCandidatesOffered: internalLinkCandidates.length,
@@ -357,6 +362,7 @@ Return ONLY a JSON object, no other text:
     status: 'pending',
     payload: {
       taskType: 'draft_refresh',
+      blogType,
       content: draft.contentHtml,
       targetKeyword: keywordResearch.primaryKeyword || topic,
       originalElement: p.originalElement,

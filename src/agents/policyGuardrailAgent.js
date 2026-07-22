@@ -133,6 +133,7 @@ export async function processGuardrailTask(task) {
         reasons: resultSummary,
         topic: task.payload.targetKeyword || task.payload.topic,
         targetKeyword: task.payload.targetKeyword,
+        blogType: task.payload.blogType,
         originalElement: task.payload.originalElement,
         triggerReason: task.payload.triggerReason,
         authorName: task.payload.authorName,
