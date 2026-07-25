@@ -79,6 +79,29 @@ router.post('/publish', async (req, res) => {
   }
 });
 
+// ---- POSTS LIST — real published blog posts, for agents that need to read
+// (not guess) what's actually live: Internal Linking, Schema, Image SEO,
+// Content Refresh. Read-only, no side effects. ----
+router.get('/posts/list', async (req, res) => {
+  try {
+    const blogs = await Blog.findAll({ where: { status: 'published' }, order: [['updatedAt', 'DESC']] });
+    res.json({
+      status: 'ok',
+      posts: blogs.map((b) => ({
+        id: b.id,
+        slug: b.slug,
+        title: b.title,
+        content: b.content,
+        excerpt: b.excerpt,
+        updatedAt: b.updatedAt,
+        createdAt: b.createdAt,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---- SCHEMA UPDATE — set JSON-LD (schema_code) on a page or blog by slug ----
 router.post('/schema/update', async (req, res) => {
   try {

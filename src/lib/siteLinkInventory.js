@@ -22,3 +22,24 @@ export async function getInternalLinkCandidates(site) {
     return [];
   }
 }
+
+/**
+ * Real published blog posts, straight from the site's own connector
+ * (GET /posts/list on the seo-agent route this project installs) — used by
+ * Internal Linking, Schema, Image SEO, and Content Refresh agents so they
+ * only ever act on what's genuinely live, never a guessed post list. Returns
+ * [] (not a throw) if the site hasn't deployed the /posts/list route yet, so
+ * an older-connector site fails soft instead of breaking these agents.
+ */
+export async function getPublishedPosts(site) {
+  if (!site.api_base_url) return [];
+  try {
+    const res = await fetch(`${site.api_base_url}/posts/list`, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.posts || [];
+  } catch (err) {
+    console.warn(`Could not fetch published posts for ${site.domain}: ${err.message}`);
+    return [];
+  }
+}

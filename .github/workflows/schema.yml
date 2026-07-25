@@ -1,0 +1,20 @@
+name: Schema Agent
+
+on:
+  schedule:
+    - cron: '0 5 * * *' # daily — cheap, catches newly published/edited posts
+  workflow_dispatch: {}
+
+jobs:
+  run-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - run: npm install
+      - run: npm run schema:run
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

@@ -12,7 +12,14 @@
     "manager:run": "node src/runners/runManager.js",
     "topic-discovery:run": "node src/runners/runTopicDiscovery.js",
     "onpage:run": "node src/runners/runOnPageSeo.js",
-    "techaudit:run": "node src/runners/runTechnicalAudit.js"
+    "techaudit:run": "node src/runners/runTechnicalAudit.js",
+    "eeat:run": "node src/runners/runEeat.js",
+    "internal-linking:run": "node src/runners/runInternalLinking.js",
+    "content-refresh:run": "node src/runners/runContentRefresh.js",
+    "schema:run": "node src/runners/runSchema.js",
+    "image-seo:run": "node src/runners/runImageSeo.js",
+    "competitor-monitoring:run": "node src/runners/runCompetitorMonitoring.js",
+    "local-seo:run": "node src/runners/runLocalSeo.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

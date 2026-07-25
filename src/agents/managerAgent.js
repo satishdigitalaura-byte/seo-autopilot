@@ -21,6 +21,7 @@ const AGENT_SCHEDULES_MIN = {
   policy_guardrail_agent: 10,
   gsc_ga4_watcher_agent: 24 * 60,
   seo_audit_agent: 7 * 24 * 60,
+  content_refresh_agent: 120,
 };
 const STALE_GRACE_MULTIPLIER = 3; // e.g. content_draft_agent flagged only if silent for 45+ min, not right at 15
 const ERROR_SPIKE_MIN_SAMPLE = 5;
