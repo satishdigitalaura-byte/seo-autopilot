@@ -80,14 +80,14 @@ export function renderApprovalButtons({ approveHref, rejectHref }) {
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px;">
       <tr>
         <td style="padding-right:12px;">
-          <a href="${approveHref}" style="display:inline-block;background:${COLORS.green};color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:8px;">✅ Approve &amp; Publish as Draft</a>
+          <a href="${approveHref}" style="display:inline-block;background:${COLORS.green};color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:8px;">✅ Approve &amp; Publish Live</a>
         </td>
         <td>
           <a href="${rejectHref}" style="display:inline-block;background:${COLORS.red};color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:700;padding:12px 22px;border-radius:8px;">❌ Reject</a>
         </td>
       </tr>
     </table>
-    <p style="margin-top:10px;font-size:11px;color:${COLORS.gray};">Clicking Approve publishes it to the site as a DRAFT only — you'll still do a final visual check before it goes live.</p>`;
+    <p style="margin-top:10px;font-size:11px;color:${COLORS.gray};">Clicking Approve publishes it live on the site immediately — no further action needed.</p>`;
 }
 
 /** Simple, email-safe horizontal bar comparison (before vs. after), no external chart image needed. */

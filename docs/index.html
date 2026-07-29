@@ -992,7 +992,7 @@ function renderPending(items) {
       <div class="draft-excerpt">${escapeHtml(t.payload?.excerpt || '')}</div>
       <button class="preview-btn" onclick="openPreview('${t.id}')">👁 Preview page</button>
       ${isAdmin ? `
-        <button class="approve" onclick="handleApprove('${t.id}')">✅ Approve &amp; Publish as Draft</button>
+        <button class="approve" onclick="handleApprove('${t.id}')">✅ Approve &amp; Publish Live</button>
         <button class="reject" onclick="handleReject('${t.id}')">❌ Reject</button>
       ` : `<div class="viewer-note">View-only account — ask an admin to approve or reject.</div>`}
       <div id="status-${t.id}" class="status-msg"></div>

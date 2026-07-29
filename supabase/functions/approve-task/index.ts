@@ -6,11 +6,9 @@
 // never committed to git).
 //
 // On approve: marks the human_review_queue task approved, then calls the
-// site's own /api/seo-agent/publish endpoint with cmsStatus:'draft' — so the
-// post lands in the CMS as a draft, and a human still does one final visual
-// check in the site's own admin panel before flipping it fully live. This
-// keeps the "one Approve tap" promise from the master architecture doc while
-// preserving a second, cheap safety check.
+// site's own /api/seo-agent/publish endpoint with cmsStatus:'published' — so
+// the post goes live immediately. One Approve tap is the entire publish step;
+// there is no second manual publish inside the site's own admin panel.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveDraftTask } from '../_shared/resolveDraft.ts';
 
