@@ -2,7 +2,7 @@ name: Policy Guardrail Agent
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '0 */6 * * *' # fallback only — the panel triggers this workflow instantly when a draft needs review; this cron just catches anything the instant-trigger missed
   workflow_dispatch: {}
 
 jobs:

@@ -2,7 +2,7 @@ name: Content Draft Agent
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */6 * * *' # fallback only — the panel triggers this workflow instantly the moment a new draft topic is created; this cron just catches anything the instant-trigger missed
   workflow_dispatch: {}
 
 jobs:

@@ -2,7 +2,7 @@ name: Topic Discovery Agent
 
 on:
   schedule:
-    - cron: '0 3 * * *' # once daily — GSC data itself only refreshes daily, running more often would just re-analyze the same window
+    - cron: '30 5 * * *' # daily, 11am IST
   workflow_dispatch: {}
 
 jobs:

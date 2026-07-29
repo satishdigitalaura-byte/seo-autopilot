@@ -2,7 +2,7 @@ name: Local SEO Agent
 
 on:
   schedule:
-    - cron: '0 4 * * 5' # weekly Friday
+    - cron: '30 4 * * 3' # weekly Wednesday, ~10am IST
   workflow_dispatch: {}
 
 jobs:

@@ -2,7 +2,7 @@ name: GSC/GA4 Watcher
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '30 5 * * 3' # weekly Wednesday, 11am IST
   workflow_dispatch: {}
 
 jobs:

@@ -2,7 +2,7 @@ name: Content Refresh Agent
 
 on:
   schedule:
-    - cron: '15 */2 * * *' # every 2 hours — picks up investigate_drop tasks the GSC/GA4 Watcher queues
+    - cron: '0 2 */3 * *' # every ~3 days, early morning IST — GSC data is daily-granularity, no need to check more often
   workflow_dispatch: {}
 
 jobs:

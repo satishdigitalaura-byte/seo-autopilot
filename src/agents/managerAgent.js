@@ -41,23 +41,29 @@ const DAY = 24 * HOUR;
  *   'critical' — core publishing pipeline. Trips the kill switch.
  *   'warning'  — advisory/analysis agent. Reported and emailed, never pauses.
  */
+// 2026-07-29: agents moved from "run constantly" to a real editorial cadence
+// (see .github/workflows/*.yml). content_draft_agent and policy_guardrail_agent
+// are no longer the primary trigger for their own work — the panel dispatches
+// them instantly when a draft is created/needs review — so their cron is now
+// only a 6h fallback net, and their intervalMin below reflects THAT, not the
+// old 10-15min poll. Every intervalMin here must track the workflow's actual
+// cron or this file starts crying wolf on a schedule that was deliberately
+// slowed down.
 const AGENT_MONITORS = {
-  content_draft_agent:         { kind: 'queue',    intervalMin: 15,      severity: 'critical' },
-  policy_guardrail_agent:      { kind: 'queue',    intervalMin: 10,      severity: 'critical' },
-  content_refresh_agent:       { kind: 'queue',    intervalMin: 2 * HOUR, severity: 'critical' },
+  content_draft_agent:         { kind: 'queue',    intervalMin: 6 * HOUR, severity: 'critical' },
+  policy_guardrail_agent:      { kind: 'queue',    intervalMin: 6 * HOUR, severity: 'critical' },
+  content_refresh_agent:       { kind: 'queue',    intervalMin: 3 * DAY, severity: 'critical' },
   human_review_queue:          { kind: 'queue',    intervalMin: 10,      severity: 'warning'  },
 
-  // cron says */10 but GitHub Actions does not honor sub-hourly schedules
-  // reliably on this plan — real gaps between runs were observed up to ~3.4h
-  // even with the workflow healthy. intervalMin here is what a *missing*
-  // workflow looks like, not the cron string itself; 10 produced constant
-  // false "heartbeat_missed" warnings on a Manager Agent that was never
-  // actually down.
-  manager_agent:               { kind: 'schedule', intervalMin: 90,      severity: 'warning'  },
-  gsc_ga4_watcher_agent:       { kind: 'schedule', intervalMin: DAY,     severity: 'warning'  },
+  // cron says */2h but GitHub Actions does not honor scheduled workflows
+  // precisely on this plan — real gaps were observed up to ~3.4x the nominal
+  // interval even when healthy. intervalMin here is what a *missing*
+  // workflow looks like, not the cron string itself.
+  manager_agent:               { kind: 'schedule', intervalMin: 3 * HOUR, severity: 'warning'  },
+  gsc_ga4_watcher_agent:       { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },
   topic_discovery_agent:       { kind: 'schedule', intervalMin: DAY,     severity: 'warning'  },
-  schema_agent:                { kind: 'schedule', intervalMin: DAY,     severity: 'warning'  },
-  internal_linking_agent:      { kind: 'schedule', intervalMin: 6 * HOUR, severity: 'warning' },
+  schema_agent:                { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },
+  internal_linking_agent:      { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning' },
   seo_audit_agent:             { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },
   on_page_seo_agent:           { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },
   technical_audit_agent:       { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },

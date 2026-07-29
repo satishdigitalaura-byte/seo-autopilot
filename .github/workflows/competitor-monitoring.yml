@@ -2,7 +2,7 @@ name: Competitor Monitoring Agent
 
 on:
   schedule:
-    - cron: '0 4 * * 6' # weekly Saturday
+    - cron: '30 5 * * 1' # weekly Monday, 11am IST
   workflow_dispatch: {}
 
 jobs:

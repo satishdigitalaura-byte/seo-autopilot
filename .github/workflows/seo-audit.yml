@@ -2,7 +2,7 @@ name: SEO Audit
 
 on:
   schedule:
-    - cron: '0 4 * * 1'
+    - cron: '30 5 * * 1' # weekly Monday, 11am IST
   workflow_dispatch: {}
 
 jobs:

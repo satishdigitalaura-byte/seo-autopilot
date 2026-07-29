@@ -2,7 +2,7 @@ name: Internal Linking Agent
 
 on:
   schedule:
-    - cron: '30 */6 * * *' # every 6 hours — cheap to run since it's pure technical work
+    - cron: '0 4 * * 3' # weekly Wednesday, ~9:30am IST — the one agent here that edits the live site with no human review, so it stays weekly not constant
   workflow_dispatch: {}
 
 jobs:

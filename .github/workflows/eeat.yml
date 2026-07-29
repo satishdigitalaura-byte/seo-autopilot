@@ -2,7 +2,7 @@ name: E-E-A-T Agent
 
 on:
   schedule:
-    - cron: '0 4 * * 4' # weekly Thursday
+    - cron: '30 5 * * 1' # weekly Monday, 11am IST
   workflow_dispatch: {}
 
 jobs:
