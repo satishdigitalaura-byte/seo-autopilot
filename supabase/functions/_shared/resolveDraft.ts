@@ -1,6 +1,5 @@
-// Shared approve/reject logic used by both approve-task (Slack/email link
-// clicks, secret-param auth) and panel-api (logged-in panel users, JWT auth)
-// so the actual publish behavior never diverges between the two entry points.
+// Shared approve/reject logic used by panel-api (logged-in panel users, JWT
+// auth) — the admin panel is the only approval channel now.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export async function resolveDraftTask(
