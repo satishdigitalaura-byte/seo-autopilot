@@ -1,7 +1,6 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { runRuleChecks } from '../rules/guidelinesRuleset.js';
 import { generateText } from '../lib/llmClient.js';
-import { sendSlackApproval } from '../lib/slackClient.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
 import { getKnowledgeBlock, SEO_EXPERT_PERSONA } from '../lib/seoKnowledge.js';
 
@@ -148,27 +147,17 @@ export async function processGuardrailTask(task) {
     completed_at: new Date().toISOString(),
   }).eq('id', task.id);
 
-  const { data: reviewTaskRows } = await supabase.from('agent_tasks').insert({
+  await supabase.from('agent_tasks').insert({
     site_id: task.site_id,
     source_agent: 'policy_guardrail_agent',
     target_agent: 'human_review_queue',
     task_type: 'approve_draft',
     payload: { ...task.payload, guardrailResult: resultSummary },
     status: 'awaiting_approval',
-  }).select();
-  const reviewTask = reviewTaskRows?.[0];
-
-  // Not critical — every draft lands in the panel's Pending Approvals queue
-  // (with a preview) the moment this task is created, so no email per draft;
-  // Slack still fires below for a quick heads-up without inbox noise.
-
-  try {
-    if (reviewTask) {
-      await sendSlackApproval({ ...reviewTask, siteDomain: site?.domain });
-    }
-  } catch (err) {
-    console.warn('Slack notification failed (non-fatal):', err.message);
-  }
+  });
+  // Every draft lands in the panel's Pending Approvals queue (with a preview)
+  // the moment this task is created — no email or Slack per draft. Approve/
+  // reject happens exclusively from the admin panel now.
 
   return resultSummary;
 }
