@@ -48,7 +48,7 @@ export async function resolveDraftTask(
       headers: { 'Content-Type': 'application/json', 'X-Seo-Agent-Secret': cred?.credential_value || '' },
       body: JSON.stringify({
         approvedByHuman: true,
-        cmsStatus: 'draft',
+        cmsStatus: 'published',
         slug: task.payload.slug,
         title: task.payload.title,
         content: task.payload.content,
@@ -60,7 +60,7 @@ export async function resolveDraftTask(
     });
     const json = await res.json();
     publishNote = res.ok
-      ? `Saved to ${site.domain} as a draft. Log in to the site admin panel for a final check before publishing live.`
+      ? `Published live on ${site.domain}.`
       : `Approved, but the site publish call failed: ${json.error || res.status}. Contact the developer.`;
   } catch (e) {
     publishNote = `Approved, but could not reach the site to save the draft: ${(e as Error).message}`;
