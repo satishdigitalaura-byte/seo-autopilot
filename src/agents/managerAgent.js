@@ -47,7 +47,13 @@ const AGENT_MONITORS = {
   content_refresh_agent:       { kind: 'queue',    intervalMin: 2 * HOUR, severity: 'critical' },
   human_review_queue:          { kind: 'queue',    intervalMin: 10,      severity: 'warning'  },
 
-  manager_agent:               { kind: 'schedule', intervalMin: 10,      severity: 'warning'  },
+  // cron says */10 but GitHub Actions does not honor sub-hourly schedules
+  // reliably on this plan — real gaps between runs were observed up to ~3.4h
+  // even with the workflow healthy. intervalMin here is what a *missing*
+  // workflow looks like, not the cron string itself; 10 produced constant
+  // false "heartbeat_missed" warnings on a Manager Agent that was never
+  // actually down.
+  manager_agent:               { kind: 'schedule', intervalMin: 90,      severity: 'warning'  },
   gsc_ga4_watcher_agent:       { kind: 'schedule', intervalMin: DAY,     severity: 'warning'  },
   topic_discovery_agent:       { kind: 'schedule', intervalMin: DAY,     severity: 'warning'  },
   schema_agent:                { kind: 'schedule', intervalMin: DAY,     severity: 'warning'  },
