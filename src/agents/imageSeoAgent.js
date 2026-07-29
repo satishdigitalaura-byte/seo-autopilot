@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { getPublishedPosts } from '../lib/siteLinkInventory.js';
+import { withSiteSecret } from '../lib/siteCredentials.js';
 
 /**
  * Image SEO Agent — ADVISORY-ONLY, same posture as On-Page SEO Agent: it
@@ -44,8 +45,16 @@ async function checkImageSize(src) {
 
 export async function runImageSeoForSite(site) {
   const supabase = getSupabaseClient();
-  const posts = await getPublishedPosts(site);
-  if (posts.length === 0) return { skipped: true, reason: 'no published posts found' };
+  // Secret first: /posts/list is behind the shared secret, so fetching the
+  // post list before loading it silently returned nothing at all.
+  const posts = await getPublishedPosts(await withSiteSecret(site));
+  if (posts.length === 0) {
+    // Logged, not just returned — see internalLinkingAgent.js: a scheduled
+    // agent that stays silent is indistinguishable from a dead one.
+    const skipped = { skipped: true, reason: 'no published posts found' };
+    await supabase.from('agent_results').insert({ site_id: site.id, agent_name: 'image_seo_agent', result: skipped });
+    return skipped;
+  }
 
   const perPost = [];
   for (const post of posts) {

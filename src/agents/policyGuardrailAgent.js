@@ -3,10 +3,11 @@ import { runRuleChecks } from '../rules/guidelinesRuleset.js';
 import { generateText } from '../lib/llmClient.js';
 import { sendSlackApproval } from '../lib/slackClient.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
+import { getKnowledgeBlock, SEO_EXPERT_PERSONA } from '../lib/seoKnowledge.js';
 
 async function runQualitativeCheck(payload, agentConfig) {
   const prompt = `You are a content policy checker for an SEO agency, applying Google's own published guidance (not invented AI-SEO tactics).
-
+${getKnowledgeBlock('policy_guardrail')}
 Evaluate this content against three tests only:
 1. Genuine unique POV / non-commodity angle — would this page tell a reader something they can't get from ten other pages on the same topic? (Google's own example of the difference: "7 Tips for First-Time Homebuyers" = commodity/low-value; "Why We Waived the Inspection & Saved Money: A Look Inside the Sewer Line" = non-commodity/high-value.)
 2. E-E-A-T signals present — is there a named author, citations/sources, or a freshness signal (a date, an updated fact)?

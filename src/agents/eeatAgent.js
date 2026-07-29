@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { generateText } from '../lib/llmClient.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
+import { getKnowledgeBlock, SEO_EXPERT_PERSONA } from '../lib/seoKnowledge.js';
 
 /**
  * E-E-A-T Agent — an ADVISORY-ONLY audit of real, live pages against
@@ -150,7 +151,7 @@ async function buildLlmSummary(site, pages, siteWideFindings) {
   const prompt = `You are a senior SEO consultant with 8+ years of hands-on experience specifically remediating E-E-A-T issues for real client sites (including YMYL sites that have gone through Google reviews). You are briefing ${site.domain}'s owner on real findings from a live audit — every finding below came from mechanically parsing the site's actual HTML; do not invent anything beyond what's listed.
 
 Remember while writing: E-E-A-T is not a literal ranking factor or a score Google computes — it's the framework human quality raters use, which correlates with ranking outcomes over time. Frame your advice that way, not as "your E-E-A-T score is X."
-
+${getKnowledgeBlock('eeat')}
 SITE-WIDE TRUST SIGNALS:
 ${siteWideBlock}
 

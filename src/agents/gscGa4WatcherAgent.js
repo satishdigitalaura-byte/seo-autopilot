@@ -124,7 +124,10 @@ export async function runWatcherForSite(site) {
 
   await supabase.from('agent_results').insert({
     site_id: site.id,
-    agent_name: 'gsc_ga4_watcher',
+    // Canonical name — must match the agent id the panel and the Manager
+    // Agent use. It used to log the shortened 'gsc_ga4_watcher', which made
+    // the panel show this agent as "never run" even right after a good run.
+    agent_name: 'gsc_ga4_watcher_agent',
     result: {
       dateRanges: { current, previous },
       pagesChecked: pages.size,

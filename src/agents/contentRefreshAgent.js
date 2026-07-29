@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { getPublishedPosts } from '../lib/siteLinkInventory.js';
+import { withSiteSecret } from '../lib/siteCredentials.js';
 
 /**
  * Content Refresh Agent — the chain-starter from Master Architecture §2.
@@ -40,7 +41,9 @@ export async function processContentRefreshTask(task) {
     return { decision: 'failed_no_site' };
   }
 
-  const posts = await getPublishedPosts(site);
+  // Secret first: /posts/list is behind the shared secret, so fetching the
+  // post list before loading it silently returned nothing at all.
+  const posts = await getPublishedPosts(await withSiteSecret(site));
   const post = matchPostByUrl(p.url, posts, site.domain);
 
   if (!post) {

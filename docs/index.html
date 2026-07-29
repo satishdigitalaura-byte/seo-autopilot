@@ -1029,7 +1029,10 @@ function summarizeNotification(n) {
         badge: 'info', title: `SEO audit — ${r.strikingDistance?.length ?? 0} striking-distance opportunities`,
         body: `<p>${r.underperformingCtr?.length ?? 0} pages with below-expected CTR · ${r.contentGapCount ?? 0} content gaps found.</p>`,
       };
+    // Both spellings: the watcher logged the short name for months before the
+    // canonical '..._agent' id, and those older rows still show in this feed.
     case 'gsc_ga4_watcher':
+    case 'gsc_ga4_watcher_agent':
       if (r.suppressed) return { badge: 'info', title: 'Watcher paused — Google core update in progress', body: '' };
       return {
         badge: r.findingsCount > 0 ? 'warning' : 'good',
@@ -1040,6 +1043,11 @@ function summarizeNotification(n) {
       if (!r.draft) return null;
       return { badge: 'info', title: `Draft ready: ${escapeHtml(r.draft.title || '(no title)')}`, body: `<p>${(r.imagesGenerated ?? 0)} image(s) generated · ${r.contentLength ?? 0} characters. See Approvals tab to review.</p>` };
     case 'manager_agent':
+      if (r.decision === 'warning') {
+        // Advisory agents that went quiet. Automation is still running, so
+        // this must not look like the red "everything stopped" alert.
+        return { badge: 'warning', title: `${(r.problems || []).length} agent(s) need attention — automation still running`, body: `<ul>${(r.problems || []).map(p => `<li><b>${escapeHtml(p.agent)}</b> — ${escapeHtml(p.detail)}</li>`).join('')}</ul>` };
+      }
       if (r.decision !== 'paused') return null;
       return { badge: 'alert', title: 'Automation paused by Manager Agent', body: `<ul>${(r.problems || []).map(p => `<li><b>${escapeHtml(p.agent)}</b> — ${escapeHtml(p.detail)}</li>`).join('')}</ul>` };
     default:

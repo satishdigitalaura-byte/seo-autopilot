@@ -43,6 +43,17 @@ export async function researchKeywords(site, topic) {
 
   const prompt = `You are doing keyword research for an SEO content brief. You are NOT allowed to invent search volume or difficulty numbers — you don't have that data. Your only job is to organize the REAL data given below and suggest natural keyword phrasing a human would actually type.
 
+═══ TARGETING MANDATE — THIS PAGE EXISTS TO GENERATE LEADS ═══
+This content is commissioned to produce enquiries, not traffic. Choose keywords accordingly:
+
+- REQUIRED search intent: **transactional** or **commercial-investigation**. Do NOT return "informational" unless the real data below makes any commercial framing impossible — and if you must, say why in reasoning.
+- REQUIRED funnel stage: **BOFU** (ready to buy) or **MOFU** (actively comparing). Never TOFU.
+- A buyer-intent keyword with 50 searches/month beats a curiosity keyword with 5,000. Rank by buying signal first, volume second.
+
+Buyer-intent modifiers to prefer when they fit the real data: "services", "agency", "company", "consultant", "for [industry]", "pricing", "cost", "packages", "quote", "hire", "near me", "[city]", "best", "top", "vs", "alternative", "comparison", "review", "case study", "results", "ROI", "worth it".
+
+Avoid pure-curiosity phrasings ("what is…", "why does…", "history of…", "meaning of…") unless the searcher plainly has budget and a decision in front of them.
+
 IMPORTANT: This agency does NOT offer backlink building / link building / off-page link acquisition as a service. Never suggest "backlinks", "link building", "backlink profile", or similar off-page-link terms as keywords, and do not treat them as a topic to write about.
 
 TOPIC: ${topic}
@@ -58,13 +69,16 @@ ${keywordClusters.length ? keywordClusters.map((c) => `- ${c.clusterName} [${c.i
 
 Based on the topic and the real data above (if any), return ONLY a JSON object:
 {
-  "primaryKeyword": "the single best target phrase — prefer a real query/high-volume term above if one fits, otherwise the most natural phrasing of the topic",
-  "secondaryKeywords": ["5-15 natural variations/related phrases a person would actually search"],
+  "primaryKeyword": "the single best BUYER-INTENT target phrase — prefer a real query/high-volume term above if one carries commercial or transactional intent, otherwise the most natural buyer-intent phrasing of the topic",
+  "secondaryKeywords": ["5-15 natural variations/related phrases a person would actually search, weighted toward commercial intent"],
+  "transactionalKeywords": ["3-6 phrases from someone ready to hire/buy right now — e.g. service+location, 'pricing', 'cost', 'agency', 'hire', 'quote', 'near me' patterns"],
+  "commercialKeywords": ["3-6 comparison/evaluation phrases from someone choosing between options — 'best', 'top', 'vs', 'alternatives', 'review', 'worth it' patterns"],
   "longTailKeywords": ["4-6 longer, more specific phrases (4+ words) a person close to converting would type — prefer real longer queries from the data above if any fit"],
   "nlpSemanticKeywords": ["8-15 topic-relevant terms/entities Google's NLP would expect near this topic (industry terms, tools, concepts) — NOT synonyms of the primary keyword, genuinely related vocabulary a subject-matter expert would naturally use"],
-  "searchIntent": "one of: informational | commercial-investigation | transactional | navigational",
+  "searchIntent": "one of: transactional | commercial-investigation (use informational ONLY if genuinely unavoidable)",
   "whatUserActuallyWants": "1 sentence — what is the searcher trying to accomplish (compare options, see pricing, get proof, etc.) so the content answers the real need, not a tangent",
-  "funnelStage": "one of: TOFU | MOFU | BOFU",
+  "buyerStage": "1 sentence — where this searcher is in the buying decision and what would make them enquire",
+  "funnelStage": "one of: BOFU | MOFU (never TOFU)",
   "reasoning": "one sentence on why, referencing the real query/volume data if it was used"
 }`;
 
@@ -77,13 +91,30 @@ Based on the topic and the real data above (if any), return ONLY a JSON object:
     parsed = {
       primaryKeyword: topic,
       secondaryKeywords: [],
+      transactionalKeywords: [],
+      commercialKeywords: [],
       longTailKeywords: [],
       nlpSemanticKeywords: [],
-      searchIntent: 'informational',
+      // The fallback defaults now match the lead-generation mandate above.
+      // They used to default to informational/TOFU, which silently produced a
+      // pure-traffic brief on every parse failure.
+      searchIntent: 'commercial-investigation',
       whatUserActuallyWants: '',
-      funnelStage: 'TOFU',
+      buyerStage: '',
+      funnelStage: 'MOFU',
       reasoning: 'Model response could not be parsed — falling back to the raw topic as primary keyword.',
     };
+  }
+
+  // Hard guard: the brief must never reach the writer as top-of-funnel, no
+  // matter what the model returned. A TOFU brief produces a page that ranks
+  // and generates nothing, which is the exact outcome this pipeline is meant
+  // to avoid.
+  if (!['BOFU', 'MOFU'].includes(String(parsed.funnelStage || '').toUpperCase())) {
+    parsed.funnelStage = 'MOFU';
+  }
+  if (String(parsed.searchIntent || '').toLowerCase() === 'informational') {
+    parsed.searchIntent = 'commercial-investigation';
   }
 
   return {

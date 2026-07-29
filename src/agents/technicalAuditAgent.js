@@ -1,8 +1,10 @@
 import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { generateText } from '../lib/llmClient.js';
-import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
+import { getInternalLinkCandidates, getPublishedPosts } from '../lib/siteLinkInventory.js';
+import { withSiteSecret } from '../lib/siteCredentials.js';
 import { getPageClicks } from '../lib/gscClient.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
+import { getKnowledgeBlock, SEO_EXPERT_PERSONA } from '../lib/seoKnowledge.js';
 
 /**
  * Technical Audit Agent — an ADVISORY-ONLY, site-wide technical SEO health
@@ -30,6 +32,10 @@ import { getAgentConfig } from '../lib/agentSettings.js';
  */
 
 const PAGE_CAP = 6;
+// Blog posts are sampled rather than fully crawled: per-page template bugs
+// (title, meta, canonical, JSON-LD) are identical across every post, so a
+// handful proves it just as well as a hundred and keeps the run cheap.
+const BLOG_SAMPLE = 3;
 
 function normalizeUrl(u) {
   return (u || '').replace(/[#?].*$/, '').replace(/\/+$/, '').toLowerCase();
@@ -91,10 +97,17 @@ export async function runTechnicalAuditForSite(site) {
     issues.push(`sitemap.xml could not be fetched: ${err.message}`);
   }
 
-  // Pick real key pages: homepage + a few from the live nav API.
+  // Real key pages: homepage, the live nav pages, AND real blog posts.
+  //
+  // Blog posts used to be excluded entirely, so this audit could report "0
+  // issues" on a site whose every blog post served the homepage's title, meta
+  // and canonical — the exact class of bug this agent exists to catch, on the
+  // exact pages the rest of the system spends its time producing.
   const navPages = await getInternalLinkCandidates(site);
-  const urls = [base, ...navPages.map((p) => p.url)];
-  const uniqueUrls = [...new Set(urls)].slice(0, PAGE_CAP);
+  const posts = await getPublishedPosts(await withSiteSecret(site));
+  const postUrls = posts.slice(0, BLOG_SAMPLE).map((p) => `${base}/blog/${p.slug}`);
+  const urls = [base, ...navPages.map((p) => p.url).slice(0, PAGE_CAP), ...postUrls];
+  const uniqueUrls = [...new Set(urls)];
 
   const pages = [];
   for (const url of uniqueUrls) {
@@ -134,18 +147,32 @@ export async function runTechnicalAuditForSite(site) {
   }
 
   // Duplicate title / meta across pages = the SPA static-meta bug.
-  const titles = pages.map((p) => (p.title || '').trim()).filter(Boolean);
-  const metas = pages.map((p) => (p.meta || '').trim()).filter(Boolean);
-  const uniqueTitles = new Set(titles);
-  const uniqueMetas = new Set(metas);
-  let duplicateMeta = false;
-  if (pages.length > 1 && titles.length > 1 && uniqueTitles.size === 1) {
-    duplicateMeta = true;
-    issues.push(`SPA META BUG: all ${titles.length} audited pages share the identical <title> ("${titles[0]}") — per-page titles are not being set.`);
+  //
+  // This deliberately looks for ANY group of pages sharing a value, not for
+  // "every page identical". Requiring all pages to match meant a site whose
+  // marketing pages render correctly but whose blog posts all fall back to the
+  // homepage's tags scored a clean bill of health — which is exactly the state
+  // thedigitalaura.com was in while its posts were unrankable.
+  function duplicateGroups(field) {
+    const byValue = new Map();
+    for (const p of pages) {
+      const v = (p[field] || '').trim();
+      if (!v) continue;
+      if (!byValue.has(v)) byValue.set(v, []);
+      byValue.get(v).push(p.url);
+    }
+    return [...byValue.entries()].filter(([, urls]) => urls.length > 1);
   }
-  if (pages.length > 1 && metas.length > 1 && uniqueMetas.size === 1) {
-    duplicateMeta = true;
-    issues.push(`SPA META BUG: all ${metas.length} audited pages share the identical meta description — per-page descriptions are not being set.`);
+
+  let duplicateMeta = false;
+  for (const [field, label] of [['title', '<title>'], ['meta', 'meta description']]) {
+    for (const [value, urls] of duplicateGroups(field)) {
+      duplicateMeta = true;
+      const shown = urls.slice(0, 4).map((u) => u.replace(base, '') || '/').join(', ');
+      issues.push(
+        `DUPLICATE ${label.toUpperCase()}: ${urls.length} pages share the same ${label} ("${value.slice(0, 70)}") — ${shown}${urls.length > 4 ? ', …' : ''}. Google treats these as the same page, so only one of them can rank.`,
+      );
+    }
   }
 
   // Real GSC index-coverage signal (optional — only if credential present).
@@ -217,9 +244,11 @@ export const runTechnicalAudit = runTechnicalAuditForSite;
 async function buildLlmSummary(site, r) {
   const agentConfig = await getAgentConfig('technical_audit_agent');
   const issuesBlock = r.issues.length ? r.issues.map((i) => `  - ${i}`).join('\n') : '  - No technical issues found.';
-  const prompt = `You are a technical SEO analyst. Below are REAL technical-audit findings for ${site.domain}, produced by making live HTTP requests and reading real Search Console data. Do NOT invent any issue, page, or number that is not listed — reason only over what is given.
+  const prompt = `${SEO_EXPERT_PERSONA}
 
-Write a short (max ~150 words), prioritized, plain-English summary for a non-technical site owner: which issues are most urgent (especially any canonical or duplicate-meta bugs, which silently hurt indexing) and what to do about each, in order.
+Below are REAL technical-audit findings for ${site.domain}, produced by making live HTTP requests and reading real Search Console data. Do NOT invent any issue, page, or number that is not listed — reason only over what is given.
+${getKnowledgeBlock('technical')}
+Write a short (max ~150 words), prioritized, plain-English summary for a non-technical site owner: which issues are most urgent (especially any canonical or duplicate-meta bugs, which silently hurt indexing) and what to do about each, in order. Where the house standards above give a hard threshold (e.g. Core Web Vitals targets, redirect-chain limits), cite the actual target rather than saying "improve it".
 
 CONTEXT: robots.txt present=${r.robots.present}; sitemap present=${r.sitemap.present} with ${r.sitemap.urlCount} URLs; pages checked=${r.pagesChecked}; GSC pages with data=${r.gscIndex.available ? r.gscIndex.pagesWithData : 'n/a'}.
 

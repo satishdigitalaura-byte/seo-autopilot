@@ -25,8 +25,13 @@ async function call(site, path, body) {
   return data;
 }
 
+/** /health sits behind the same shared secret as every other route, so it has
+ * to be sent here too — a bare call just comes back 401. */
 export function checkHealth(site) {
-  return fetch(`${site.api_base_url}/health`).then((r) => r.json());
+  const secret = site.credentials?.seo_agent_shared_secret;
+  return fetch(`${site.api_base_url}/health`, {
+    headers: secret ? { 'X-Seo-Agent-Secret': secret } : {},
+  }).then((r) => r.json());
 }
 
 /** task.payload must include approvedByHuman: true — enforced again server-side. */

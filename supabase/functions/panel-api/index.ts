@@ -85,8 +85,16 @@ Deno.serve(async (req) => {
 
   if (action === 'list') {
     const [{ data: pending }, { data: recent }, { data: sites }, { data: results }, { data: sysStatus }, { data: agentSettingsRows }] = await Promise.all([
-      supabase.from('agent_tasks').select('*, sites(domain)').eq('task_type', 'approve_draft').eq('status', 'awaiting_approval').order('created_at', { ascending: false }),
-      supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').order('created_at', { ascending: false }).limit(30),
+      // `archived` in the payload hides old test/superseded runs from the panel
+      // WITHOUT deleting them — the rows stay in the table and the flag can be
+      // cleared to bring any of them back.
+      //
+      // The null check is load-bearing. A plain .not('payload->>archived','eq','true')
+      // evaluates to NOT (NULL = 'true') = NULL for every task that has no
+      // archived key at all — i.e. every NEW task — so Postgres filters them
+      // out too and the panel goes permanently empty.
+      supabase.from('agent_tasks').select('*, sites(domain)').eq('task_type', 'approve_draft').eq('status', 'awaiting_approval').or('payload->>archived.is.null,payload->>archived.neq.true').order('created_at', { ascending: false }),
+      supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').or('payload->>archived.is.null,payload->>archived.neq.true').order('created_at', { ascending: false }).limit(30),
       supabase.from('sites').select('id, domain, name').order('domain'),
       supabase.from('agent_results').select('agent_name, created_at, result').order('created_at', { ascending: false }).limit(200),
       supabase.from('system_status').select('*').eq('id', 1).single(),
@@ -129,9 +137,17 @@ Deno.serve(async (req) => {
         runIntervalMinutes: row.run_interval_minutes ?? null,
       };
     }
+    // Historical agent_name values that predate the canonical ids above. The
+    // GSC/GA4 Watcher logged 'gsc_ga4_watcher' for months, so without this the
+    // panel showed it as "never run" even minutes after a successful run.
+    const AGENT_NAME_ALIASES: Record<string, string> = {
+      gsc_ga4_watcher: 'gsc_ga4_watcher_agent',
+    };
+
     const lastRunByAgent: Record<string, string> = {};
     for (const r of results || []) {
-      if (!lastRunByAgent[r.agent_name]) lastRunByAgent[r.agent_name] = r.created_at;
+      const agentId = AGENT_NAME_ALIASES[r.agent_name] || r.agent_name;
+      if (!lastRunByAgent[agentId]) lastRunByAgent[agentId] = r.created_at;
       // keyword_planner isn't a separate DB agent — it runs inside every
       // content_draft_agent result that actually used real ads/GSC data.
       if (r.agent_name === 'content_draft_agent' && !lastRunByAgent['keyword_planner']) {

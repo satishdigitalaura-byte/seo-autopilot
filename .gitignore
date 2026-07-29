@@ -5,3 +5,7 @@ node_modules/
 _*.mjs
 secrets/
 supabase/.temp/
+
+# Website source archives handed over by/for the developer — large binaries,
+# never belong in this repo.
+*.zip

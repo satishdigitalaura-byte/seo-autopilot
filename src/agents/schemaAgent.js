@@ -35,23 +35,34 @@ function extractFaqPairs(html) {
   return pairs;
 }
 
+/**
+ * Note on @context: it is set once at the top level, never repeated on the
+ * members of an @graph. Repeating it there is redundant and some validators
+ * flag it, so the builders below deliberately return context-free nodes and
+ * runSchemaAgentForSite adds the single wrapper.
+ */
 function buildArticleSchema(post, site) {
   const baseUrl = `https://${site.domain}`.replace(/\/+$/, '');
   return {
-    '@context': 'https://schema.org',
     '@type': 'Article',
     headline: post.title,
     description: post.excerpt || undefined,
     datePublished: post.createdAt || undefined,
     dateModified: post.updatedAt || post.createdAt || undefined,
     mainEntityOfPage: `${baseUrl}/blog/${post.slug}`,
-    publisher: { '@type': 'Organization', name: site.domain.replace(/^www\./, '').split('.')[0] },
+    // The real business name, not a slice of the hostname — the previous
+    // domain.split('.')[0] published "thedigitalaura" as the publisher, which
+    // is not what this organisation is actually called anywhere else.
+    publisher: {
+      '@type': 'Organization',
+      name: site.name || site.domain.replace(/^www\./, ''),
+      url: baseUrl,
+    },
   };
 }
 
 function buildFaqSchema(pairs) {
   return {
-    '@context': 'https://schema.org',
     '@type': 'FAQPage',
     mainEntity: pairs.map((p) => ({
       '@type': 'Question',
@@ -63,10 +74,19 @@ function buildFaqSchema(pairs) {
 
 export async function runSchemaAgentForSite(site) {
   const supabase = getSupabaseClient();
-  const posts = await getPublishedPosts(site);
-  if (posts.length === 0) return { skipped: true, reason: 'no published posts found' };
-
+  // Secret first: /posts/list is behind the shared secret, so fetching the
+  // post list before loading it silently returned nothing at all.
   const siteWithSecret = await withSiteSecret(site);
+
+  const posts = await getPublishedPosts(siteWithSecret);
+  if (posts.length === 0) {
+    // Logged, not just returned — see internalLinkingAgent.js: a scheduled
+    // agent that stays silent is indistinguishable from a dead one.
+    const skipped = { skipped: true, reason: 'no published posts found' };
+    await supabase.from('agent_results').insert({ site_id: site.id, agent_name: 'schema_agent', result: skipped });
+    return skipped;
+  }
+
   const results = [];
 
   for (const post of posts) {
@@ -74,7 +94,7 @@ export async function runSchemaAgentForSite(site) {
     const faqPairs = extractFaqPairs(post.content || '');
     const schemaGraph = faqPairs.length >= 2
       ? { '@context': 'https://schema.org', '@graph': [article, buildFaqSchema(faqPairs)] }
-      : article;
+      : { '@context': 'https://schema.org', ...article };
 
     try {
       await updateSchema(siteWithSecret, { slug: post.slug, jsonLd: schemaGraph });

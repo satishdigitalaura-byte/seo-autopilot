@@ -4,6 +4,7 @@ import { getStrikingDistanceQueries, getContentGapQueries, getQueryMovement } fr
 import { getKeywordIdeas } from '../lib/googleAdsClient.js';
 import { scoreKeywords, clusterKeywords } from '../lib/keywordStrategy.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
+import { getKnowledgeBlock, SEO_EXPERT_PERSONA } from '../lib/seoKnowledge.js';
 
 /**
  * Topic Discovery Agent — a senior SEO strategist that finds WHAT to write
@@ -54,7 +55,8 @@ Rules you must never break:
 - Prioritize genuine ranking leverage over vanity metrics: a striking-distance query (already ranking, just needs a push) usually beats a content-gap query (starting from nothing), which usually beats a brand-new keyword idea with zero current relevance — unless the real search volume/competition numbers argue otherwise. Explain your actual reasoning per pick, don't just follow this ordering blindly.
 - Prefer queries with clear commercial or informational intent that matches what this business actually sells/does over generic high-volume terms that would bring the wrong visitor.
 - If two opportunities target the same underlying topic, don't recommend both — pick the stronger one (avoids the site cannibalizing its own rankings).
-- For each pick, decide "refresh_existing" (a real ranking page already exists for this, per the data) vs "new_page" (no real page targets this yet) — get this right using the data given, don't guess.`;
+- For each pick, decide "refresh_existing" (a real ranking page already exists for this, per the data) vs "new_page" (no real page targets this yet) — get this right using the data given, don't guess.
+${getKnowledgeBlock('topic_discovery')}`;
 
 async function buildSiteDataDigest(supabase, site, gscProperty) {
   const current = dateRange(31, 3);

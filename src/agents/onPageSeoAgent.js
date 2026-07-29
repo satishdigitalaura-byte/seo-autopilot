@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../lib/supabaseClient.js';
 import { generateText } from '../lib/llmClient.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
+import { getKnowledgeBlock, SEO_EXPERT_PERSONA } from '../lib/seoKnowledge.js';
 
 /**
  * On-Page SEO Agent — an ADVISORY-ONLY per-page on-page audit. It fetches a
@@ -210,9 +211,11 @@ async function buildLlmSummary(site, pages) {
       (p.findings.length ? p.findings.map((f) => `  - ${f}`).join('\n') : '  - No issues found.');
   }).join('\n\n');
 
-  const prompt = `You are an SEO analyst. Below are REAL on-page audit findings for ${site.domain}, produced by mechanically parsing each page's live HTML. Do NOT invent any numbers, pages, or issues that are not listed here — only reason over what is given.
+  const prompt = `${SEO_EXPERT_PERSONA}
 
-Write a short (max ~150 words), prioritized, plain-English summary for a non-technical site owner: which 3-4 fixes would have the biggest SEO impact and why, in order. Be concrete and reference the actual pages/issues listed.
+Below are REAL on-page audit findings for ${site.domain}, produced by mechanically parsing each page's live HTML. Do NOT invent any numbers, pages, or issues that are not listed here — only reason over what is given.
+${getKnowledgeBlock('on_page')}
+Write a short (max ~150 words), prioritized, plain-English summary for a non-technical site owner: which 3-4 fixes would have the biggest SEO impact and why, in order. Be concrete and reference the actual pages/issues listed. When a finding maps to a specific threshold in the house standards above (e.g. title length, heading rules), state the correct target so the owner knows what "fixed" looks like.
 
 FINDINGS:
 ${findingsBlock}`;

@@ -25,8 +25,25 @@ import { applyInternalLinks } from '../lib/siteConnectors/expressSiteConnector.j
  *      anchor text; never links to a URL that doesn't exist right now.
  */
 
-const STOPWORDS = new Set(['the', 'a', 'an', 'and', 'or', 'for', 'to', 'of', 'in', 'on', 'with', 'your', 'how', 'why', 'what', 'is', 'are', 'you', 'that', 'this', 'can', 'best', 'guide', 'vs']);
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'for', 'to', 'of', 'in', 'on', 'with', 'your', 'how', 'why',
+  'what', 'is', 'are', 'you', 'that', 'this', 'can', 'best', 'guide', 'vs',
+  // Generic modifiers and filler nouns. These pass a naive length test but
+  // carry no topic on their own — linking the bare word "small" or "better"
+  // tells Google nothing and reads as a broken link to a human.
+  'small', 'large', 'big', 'good', 'better', 'great', 'more', 'less', 'most', 'very', 'much',
+  'new', 'old', 'top', 'real', 'full', 'easy', 'simple', 'quick', 'fast', 'slow', 'high', 'low',
+  'need', 'needs', 'want', 'wants', 'make', 'makes', 'made', 'get', 'gets', 'use', 'uses',
+  'using', 'from', 'into', 'about', 'when', 'where', 'which', 'their', 'there', 'here', 'been',
+  'have', 'has', 'had', 'will', 'would', 'should', 'could', 'them', 'they', 'were', 'was',
+  'step', 'steps', 'tips', 'ways', 'things', 'stuff', 'like', 'just', 'also', 'than', 'then',
+]);
 const MAX_LINKS_PER_POST = 3;
+// An anchor must be a real phrase, not one word. A single generic word gives
+// Google no topical signal and looks accidental to a reader — and a bad link
+// on a live page is worse than no link at all, so anything that can't produce
+// a genuine phrase is skipped rather than downgraded.
+const MIN_ANCHOR_WORDS = 2;
 
 function significantWords(title) {
   return (title || '')
@@ -36,7 +53,29 @@ function significantWords(title) {
     .filter((w) => w.length > 3 && !STOPWORDS.has(w));
 }
 
-function findCandidateLinks(post, allPosts, baseUrl) {
+/**
+ * The longest run of consecutive words from `title` that appears verbatim in
+ * `content` and carries at least MIN_ANCHOR_WORDS significant words. Working
+ * from the longest candidate down means the most descriptive available anchor
+ * wins, e.g. "google ads targeting" rather than "google".
+ */
+function longestPhraseInContent(title, content) {
+  const words = (title || '').split(/\s+/).filter(Boolean);
+  for (let len = Math.min(words.length, 8); len >= MIN_ANCHOR_WORDS; len--) {
+    for (let start = 0; start + len <= words.length; start++) {
+      const phrase = words.slice(start, start + len).join(' ');
+      if (significantWords(phrase).length < MIN_ANCHOR_WORDS) continue;
+      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp(`\\b${escaped}\\b`, 'i').test(content)) return phrase;
+    }
+  }
+  return null;
+}
+
+/** Exported so the anchor-quality rules can be checked without writing to a
+ *  live site — the "small" anchor that shipped before was only caught after it
+ *  was already public. */
+export function findCandidateLinks(post, allPosts, baseUrl) {
   const postWords = new Set(significantWords(post.title));
   const contentLower = (post.content || '').toLowerCase();
 
@@ -47,24 +86,27 @@ function findCandidateLinks(post, allPosts, baseUrl) {
     const overlap = otherWords.filter((w) => postWords.has(w));
     if (overlap.length === 0) continue;
 
-    // Anchor text must genuinely appear as plain text and not already be linked.
-    const escapedTitle = other.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const titleRe = new RegExp(`\\b(${escapedTitle})\\b`, 'i');
     const alreadyLinked = contentLower.includes(`href="${baseUrl}/blog/${other.slug}"`);
-    if (!alreadyLinked && titleRe.test(post.content || '')) {
-      candidates.push({ anchorText: other.title, targetUrl: `${baseUrl}/blog/${other.slug}`, overlapScore: overlap.length });
-      continue;
-    }
+    if (alreadyLinked) continue;
 
-    // Fall back to a shared significant word/phrase that appears verbatim,
-    // so a topically related post can still get linked even if the exact
-    // title isn't quoted in the text.
-    for (const word of overlap) {
-      const wordRe = new RegExp(`\\b(${word})\\b`, 'i');
-      if (!alreadyLinked && wordRe.test(post.content || '')) {
-        candidates.push({ anchorText: word, targetUrl: `${baseUrl}/blog/${other.slug}`, overlapScore: overlap.length });
-        break;
-      }
+    // Anchor text must genuinely appear as plain text. Best case the whole
+    // title is quoted; otherwise the longest real phrase from it that the
+    // content actually contains. If neither exists, this pair simply doesn't
+    // get a link — the old code fell back to a single shared word here, which
+    // is how the bare word "small" ended up as a live anchor.
+    const escapedTitle = other.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const anchorText = new RegExp(`\\b(${escapedTitle})\\b`, 'i').test(post.content || '')
+      ? other.title
+      : longestPhraseInContent(other.title, post.content || '');
+
+    if (anchorText) {
+      candidates.push({
+        anchorText,
+        targetUrl: `${baseUrl}/blog/${other.slug}`,
+        // Prefer the more descriptive anchor when several candidates tie on
+        // topical overlap.
+        overlapScore: overlap.length * 10 + anchorText.split(/\s+/).length,
+      });
     }
   }
 
@@ -78,12 +120,20 @@ export async function runInternalLinkingForSite(site) {
   const supabase = getSupabaseClient();
   const baseUrl = `https://${site.domain}`.replace(/\/+$/, '');
 
-  const posts = await getPublishedPosts(site);
+  // Secret first: /posts/list is behind the shared secret, so fetching the
+  // post list before loading it silently returned nothing at all.
+  const siteWithSecret = await withSiteSecret(site);
+
+  const posts = await getPublishedPosts(siteWithSecret);
   if (posts.length < 2) {
-    return { skipped: true, reason: 'fewer than 2 published posts — nothing to cross-link yet' };
+    // Logged, not just returned: the Manager Agent's heartbeat check treats
+    // silence from a scheduled agent as "its workflow stopped firing", so a
+    // deliberate skip has to leave a trace or it reads as a fault.
+    const skipped = { skipped: true, postsFound: posts.length, reason: 'fewer than 2 published posts — nothing to cross-link yet' };
+    await supabase.from('agent_results').insert({ site_id: site.id, agent_name: 'internal_linking_agent', result: skipped });
+    return skipped;
   }
 
-  const siteWithSecret = await withSiteSecret(site);
   const perPostResults = [];
 
   for (const post of posts) {

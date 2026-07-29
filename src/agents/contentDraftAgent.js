@@ -3,6 +3,7 @@ import { generateText } from '../lib/llmClient.js';
 import { researchKeywords } from '../lib/keywordResearch.js';
 import { getInternalLinkCandidates } from '../lib/siteLinkInventory.js';
 import { getAgentConfig } from '../lib/agentSettings.js';
+import { getKnowledgeBlock, SEO_EXPERT_PERSONA } from '../lib/seoKnowledge.js';
 import { generateAndInsertImages } from '../lib/imageInserter.js';
 import { getTemplateGuidance, isValidBlogType } from '../lib/contentTemplates.js';
 
@@ -91,10 +92,23 @@ export async function processContentDraftTask(task) {
   const wordTarget = isCompetitiveTopic ? `${wordMin}-2800 (competitive/pillar topic)` : `${wordMin}-1600 (standard topic)`;
 
   const prompt = `You are an expert SEO content writer and conversion copywriter for ${site?.name || 'the client'}, writing content that must genuinely help a human reader first — not content written primarily to please a search algorithm. Follow Google's ACTUAL published guidance, not mythbusted "AEO/GEO" tactics. You also follow a strict on-page SEO checklist (below) on every single draft, because that checklist is what gets this content actually ranking, not just published.
+${getKnowledgeBlock('content_draft')}
+═══ THIS PAGE'S JOB: GENERATE ENQUIRIES, NOT TRAFFIC ═══
+This is a ${keywordResearch.funnelStage} page for a ${keywordResearch.searchIntent} searcher. Write for a reader who is already considering paying someone to solve this — not for a browser who is merely curious.
+
+What that changes about how you write:
+- Assume the reader has the problem RIGHT NOW and a budget. Skip "what is X and why it matters" throat-clearing; they already know why it matters.
+- Every major section must move them closer to a decision: show what good looks like, what it costs them to stay as they are, what the work actually involves, and what results look like.
+- Demonstrate competence by being specific and useful enough that a reader thinks "these people clearly do this every day" — that is what earns the enquiry. Never beg, never hype.
+- Name the real objections a buyer at this stage has (cost, time, risk, "can I do this myself?") and answer them honestly, including where doing it themselves IS the right call. Honest handling of that converts better than pretending it never applies.
+- ${keywordResearch.buyerStage ? `Where this reader is in the decision: ${keywordResearch.buyerStage}` : 'Write for a reader actively comparing their options.'}
+- Do NOT overpromise, guarantee rankings, or imply a timeline SEO can't deliver. Overclaiming gets this draft rejected and destroys trust with exactly the buyer you want.
 
 ═══ KEYWORD RESEARCH (already done — use this, don't invent your own) ═══
 Primary keyword: ${keywordResearch.primaryKeyword}
 Secondary keywords (use several naturally): ${(keywordResearch.secondaryKeywords || []).join(', ') || 'none'}
+TRANSACTIONAL keywords — from someone ready to hire now. Work 2-3 into the copy naturally, ideally near the CTA and in the FAQ: ${(keywordResearch.transactionalKeywords || []).join(', ') || 'none supplied'}
+COMMERCIAL / comparison keywords — from someone choosing between options. Work 2-3 into H2s or the comparison section: ${(keywordResearch.commercialKeywords || []).join(', ') || 'none supplied'}
 Long-tail keywords (weave 1-2 into subheadings or FAQ): ${(keywordResearch.longTailKeywords || []).join(', ') || 'none'}
 NLP/semantic terms (sprinkle naturally where topically relevant — this is what tells Google/AI engines you actually understand the topic, not just the keyword): ${(keywordResearch.nlpSemanticKeywords || []).join(', ') || 'none'}
 Search intent: ${keywordResearch.searchIntent} | Funnel stage: ${keywordResearch.funnelStage}
@@ -129,7 +143,7 @@ ${keywordResearch.realQueriesUsed?.length ? `Real queries already bringing visit
     - "caption": a short (under 15 words) human-readable caption that will be shown under the image on the page — should add real context/detail from that section, not just restate the heading.
     - "suggestedFileName": SEO-friendly filename.
     Never ask for literal text/words/numbers/logos to appear rendered inside the image itself — diffusion models render text badly; put any specific number or label in the caption instead.
-16. INTERNAL LINKS: naturally weave in 3-8 links if enough real candidates exist (use as many of the real list below as make sense — never fewer than what naturally fits, never invent a URL):
+16. INTERNAL LINKS — ROUTE THE READER TOWARD ENQUIRING: naturally weave in 3-8 links if enough real candidates exist (use as many of the real list below as make sense — never fewer than what naturally fits, never invent a URL). Because this is a ${keywordResearch.funnelStage} page, at least one link must go to a commercially relevant page (services, pricing, case studies or contact) at the moment the reader is most convinced — right after a proof point or result, not stranded in the intro. Anchor text must be a descriptive multi-word phrase that already reads naturally in the sentence; never a single generic word, never "click here" or "learn more".
 ${linkList}
 17. EXTERNAL LINKS: NEVER link out to any domain other than ${site?.domain || 'this site'}. No links to Google, competitors, sources, "further reading," or any other outside website — every single <a href> in the content must point only to an internal page from the list above (or omit the link entirely if no internal page fits naturally). If you'd normally cite an outside authority, mention it by name in plain text without a link instead.
 18. FAQ SECTION: include 3-6 genuinely useful questions and concise answers relevant to this exact topic (return in the "faqs" field, and also render them as a visible FAQ section in the HTML near the end, before the CTA).
@@ -138,9 +152,21 @@ ${linkList}
 21. TABLE OF CONTENTS: if the article is long (roughly 1500+ words), set "needsTableOfContents": true and make sure H2s are descriptive enough to work as TOC entries.
 22. READABILITY: short paragraphs (2-4 lines), bullet/numbered lists where they aid scanning, generous white space — no dense walls of text.
 23. CTA: end with a clear, specific call-to-action tied to a real next step. ${ctaLink ? `Link it to: ${ctaLink.url} (anchor text like "${ctaLink.anchorText}" or a natural variation).` : 'No contact page available — write a strong CTA without a link.'}
-24. E-E-A-T: write from firsthand agency experience — phrases like "in our experience," "our client," "after we optimized," grounded in the ORIGINAL ELEMENT below, never generic corporate voice.
+24. E-E-A-T — ALL FOUR SIGNALS, NOT JUST TONE:
+    - EXPERIENCE: at least 2 passages describing something the agency actually did and what happened, grounded in the ORIGINAL ELEMENT — "in our experience," "our client," "after we optimized," including a decision that turned out to be wrong or a trade-off that had to be made. Real practitioners describe friction; only marketing copy is frictionless.
+    - EXPERTISE: explain at least one mechanism, not just an instruction — WHY the recommended thing works, at a level a competitor's blog post wouldn't bother with.
+    - AUTHORITATIVENESS: name the specific tools, platforms, standards or Google features involved by their real names (in plain text, not links). Vagueness reads as second-hand knowledge.
+    - TRUSTWORTHINESS: state limits honestly — what this approach does NOT fix, who it is not right for, what the reader should verify themselves. Attribute every figure to its source and date. This is the single strongest trust signal available and most articles skip it.
+    Never generic corporate voice.
 25. FRESHNESS: where it reads naturally, signal currency (e.g. include "${currentYear}" in the title or an H2 if genuinely relevant to the topic — don't force it if awkward).
-26. AI OVERVIEW / AI-ASSISTANT FRIENDLY (AIO/GEO): use direct, extractable answers where natural, comparison/definition-style clarity, and let at least one section be structured as a list or short table if the content genuinely suits it — but do NOT force a rigid "answer in the first 40 words" formula; let structure serve the reader.
+26. AI OVERVIEW / GENERATIVE ENGINE OPTIMIZATION (AIO/GEO) — MANDATORY: AI Overviews and assistants increasingly answer the query before the user ever reaches a website. To be the source they quote, this article must contain passages that stand on their own when lifted out of context:
+    - SELF-CONTAINED ANSWERS: under at least 3 H2/H3 headings, the first 2-3 sentences must fully answer that heading's question WITHOUT depending on earlier paragraphs. No "as mentioned above", no "this", no "it" referring backwards. An AI quoting just those sentences must produce something true and complete.
+    - NAME THE SUBJECT: repeat the actual subject noun instead of pronouns in those opening sentences ("Google Ads targeting reduces wasted spend by…" not "It reduces wasted spend by…"). Extraction strips the surrounding context that makes a pronoun resolvable.
+    - CITABLE SPECIFICS: include at least 2 concrete, attributable data points from the ORIGINAL ELEMENT stated as complete sentences with their own context ("In our audit of 6 pages on thedigitalaura.com in July 2026, the average score was 60/100"). Bare numbers with no subject cannot be cited.
+    - DEFINITION SENTENCE: define the primary keyword in one clean sentence of the form "X is …" somewhere in the first two sections.
+    - STRUCTURED BLOCKS: at least one genuine comparison table OR numbered step sequence — these are disproportionately favoured for extraction. Skip only if the topic truly cannot support one.
+    - The FAQ answers must each be complete standalone answers for the same reason.
+    Do NOT let this flatten the writing into a robotic Q&A list — it must still read as one continuous, well-argued article to a human.
 27. ENGAGEMENT ELEMENTS: use a comparison table, numbered steps, or definition callout somewhere if the topic genuinely supports it (skip if it would feel forced).
 28. TECHNICAL HYGIENE: only real internal links, only real/well-known external links, clean semantic HTML, no broken markup, no placeholder text left in.
 29. NO BACKLINK/LINK-BUILDING CLAIMS: this agency does NOT offer backlink building / link building / off-page link acquisition as a service. Never mention "backlinks", "link building", or claim/imply that service anywhere in the title, keywords, FAQs, or body — not even as a generic SEO-tips mention. If it would naturally come up, skip it or replace it with an on-page/technical/local SEO point instead.
@@ -157,6 +183,16 @@ ORIGINAL ELEMENT (the backbone of the article): ${p.originalElement}
 ${p.triggerReason ? `WHY WE ARE WRITING THIS: ${p.triggerReason}` : ''}
 ${p.originalContent ? `EXISTING CONTENT TO REFRESH (genuinely improve it, do not just reword):\n${String(p.originalContent).slice(0, 4000)}` : ''}
 ${site?.is_ymyl ? `\nTHIS IS A YMYL SITE — be extra precise and cautious with any factual/health/financial claims.` : ''}
+
+═══ YMYL SELF-CHECK (applies even on a non-YMYL site) ═══
+"Your Money or Your Life" is judged per PAGE, not per site. A marketing agency's blog becomes YMYL the moment a post advises on how someone spends real budget, on legal/tax/compliance obligations, on health or safety, or on anything that could damage a reader's finances or livelihood if it were wrong.
+If this article touches ANY of those — and advice about ad spend, pricing, contracts or business investment does — then:
+- State claims with their real conditions attached. Never present "this works" when the truth is "this worked for this client, in this market, at this budget".
+- Attribute every number to where it actually came from and when. No unattributed industry statistics.
+- Say plainly when something depends on factors you can't see from here, and when a reader should get professional advice specific to their situation.
+- Never guarantee a financial outcome, a ranking, or a timeline.
+- Make the author and their basis for knowing this visible — this is precisely where E-E-A-T carries the most weight.
+If it genuinely touches none of those, ignore this block.
 ${p.reasons?.qualitative?.reasoning || p.reasons?.hardFailures?.length ? `
 ═══ THIS IS A REVISION — THE PREVIOUS DRAFT WAS REJECTED, DO NOT REPEAT THE SAME MISTAKE ═══
 ${p.reasons?.qualitative?.reasoning ? `Rejection reason: "${p.reasons.qualitative.reasoning}"
