@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>SEO Autopilot — Panel</title>
+<link rel="icon" type="image/png" href="assets/favicon-src.png" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -44,7 +45,7 @@
     background: var(--card); border-radius: 20px; padding: 42px 34px;
     box-shadow: var(--shadow-lg); border: 1px solid var(--border);
   }
-  .login-box .logo-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg,var(--orange),var(--orange2)); margin: 0 auto 14px; box-shadow: 0 0 0 5px rgba(255,107,43,0.15); }
+  .login-box .logo-dot { width: 96px; height: auto; margin: 0 auto 18px; display: block; }
   .login-box h1 { font-size: 22px; color: var(--dark); margin: 0 0 4px; font-weight: 800; letter-spacing: -0.02em; }
   input, select, textarea {
     width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 11px;
@@ -76,11 +77,7 @@
   }
   .sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 6px 8px 20px; }
   .sidebar-brand .logo-mark {
-    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-    background: linear-gradient(135deg, var(--orange) 0%, #F0567A 55%, var(--purple) 100%);
-    box-shadow: 0 6px 16px rgba(255,107,43,0.35), inset 0 0 0 1px rgba(255,255,255,0.25);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 15px; color: #fff;
+    width: 46px; height: auto; flex-shrink: 0; object-fit: contain;
   }
   .sidebar-brand .name { font-weight: 800; font-size: 14.5px; color: #fff; line-height: 1.2; letter-spacing: -0.01em; }
   .sidebar-brand .sub { font-size: 11px; color: #8B98BE; }
@@ -443,7 +440,7 @@
 <body>
 
 <div id="login-screen" class="login-box">
-  <div class="logo-dot"></div>
+  <img class="logo-dot" src="assets/logo-icon.png" alt="Digital Aura" />
   <h1>SEO Autopilot Panel</h1>
   <p style="color:var(--gray);font-size:13.5px;margin-bottom:22px;">Digital Aura — sign in to continue</p>
   <div id="step-email">
@@ -460,7 +457,7 @@
 
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="logo-mark">DA</div>
+      <img class="logo-mark" src="assets/logo-icon.png" alt="Digital Aura" />
       <div><div class="name">Digital Aura</div><div class="sub">SEO Autopilot</div></div>
     </div>
     <div class="workspace"><span class="dot"></span><div class="wtext"><b>thedigitalaura.com</b><span>Pro workspace</span></div></div>
