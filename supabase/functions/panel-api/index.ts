@@ -148,21 +148,43 @@ Deno.serve(async (req) => {
     // Historical agent_name values that predate the canonical ids above. The
     // GSC/GA4 Watcher logged 'gsc_ga4_watcher' for months, so without this the
     // panel showed it as "never run" even minutes after a successful run.
-    const AGENT_NAME_ALIASES: Record<string, string> = {
-      gsc_ga4_watcher: 'gsc_ga4_watcher_agent',
+    const AGENT_NAME_ALIASES: Record<string, string[]> = {
+      gsc_ga4_watcher_agent: ['gsc_ga4_watcher_agent', 'gsc_ga4_watcher'],
     };
 
+    // Deriving lastRun from the shared 200-row `results` list silently broke
+    // for any agent whose real last run had since scrolled off that window —
+    // confirmed live: seo_audit_agent's real last run (10 days old) was
+    // hidden behind 205 more-recent rows from other agents and showed as
+    // "never run" even though it was healthy. A dedicated per-agent query
+    // can never be pushed off a shared window, so it stays correct forever
+    // regardless of how much other agents' activity grows.
+    const dbAgentIds = AGENTS.map((a) => a.id).filter((id) => id !== 'keyword_planner');
+    const lastRunQueries = await Promise.all(
+      dbAgentIds.map((id) => {
+        const names = AGENT_NAME_ALIASES[id] || [id];
+        return supabase.from('agent_results').select('created_at').in('agent_name', names)
+          .order('created_at', { ascending: false }).limit(1);
+      }),
+    );
     const lastRunByAgent: Record<string, string> = {};
-    for (const r of results || []) {
-      const agentId = AGENT_NAME_ALIASES[r.agent_name] || r.agent_name;
-      if (!lastRunByAgent[agentId]) lastRunByAgent[agentId] = r.created_at;
-      // keyword_planner isn't a separate DB agent — it runs inside every
-      // content_draft_agent result that actually used real ads/GSC data.
-      if (r.agent_name === 'content_draft_agent' && !lastRunByAgent['keyword_planner']) {
-        const kw = (r.result as any)?.keywordResearch;
-        if (kw && ((kw.adsKeywordIdeasUsed?.length ?? 0) > 0 || (kw.realQueriesUsed?.length ?? 0) > 0)) {
-          lastRunByAgent['keyword_planner'] = r.created_at;
-        }
+    dbAgentIds.forEach((id, i) => {
+      const row = lastRunQueries[i].data?.[0];
+      if (row) lastRunByAgent[id] = row.created_at;
+    });
+
+    // keyword_planner isn't a separate DB agent — it runs inside every
+    // content_draft_agent result that actually used real ads/GSC data.
+    // Scan a bounded recent slice of content_draft_agent's own rows (not the
+    // shared cross-agent window) so this can't fall prey to the same bug.
+    const { data: recentDrafts } = await supabase.from('agent_results')
+      .select('created_at, result').eq('agent_name', 'content_draft_agent')
+      .order('created_at', { ascending: false }).limit(30);
+    for (const r of recentDrafts || []) {
+      const kw = (r.result as any)?.keywordResearch;
+      if (kw && ((kw.adsKeywordIdeasUsed?.length ?? 0) > 0 || (kw.realQueriesUsed?.length ?? 0) > 0)) {
+        lastRunByAgent['keyword_planner'] = r.created_at;
+        break;
       }
     }
     const agents = AGENTS.map((a) => ({
