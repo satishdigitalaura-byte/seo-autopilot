@@ -288,6 +288,22 @@
   button.preview-btn { background: #fff; color: var(--dark); border: 1px solid var(--border); padding: 8px 15px; border-radius: 9px; cursor: pointer; font-weight: 700; margin-right: 8px; font-size: 12.5px; transition: background 0.15s, transform 0.1s; }
   button.preview-btn:hover { background: var(--bg); transform: translateY(-1px); }
 
+  /* Edit proposals — an existing live page being changed, not a new draft. */
+  .edit-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .tag-edit { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: #FEF3C7; color: #92400E; }
+  .tag-kind { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: #DBEAFE; color: #1D4ED8; }
+  .edit-url { font-size: 11.5px; color: var(--gray); word-break: break-all; }
+  .edit-url a { color: var(--gray); }
+  .edit-reason { font-size: 12px; color: #92400E; background: #FFFBEB; border-left: 3px solid #F59E0B; padding: 8px 11px; border-radius: 0 8px 8px 0; margin-bottom: 12px; line-height: 1.5; }
+  .diff-block { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+  .diff-field { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gray); background: var(--bg); padding: 6px 11px; border-bottom: 1px solid var(--border); }
+  .diff-row { padding: 9px 11px; font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+  .diff-row.before { background: #FEF2F2; color: #7F1D1D; border-bottom: 1px solid var(--border); }
+  .diff-row.after { background: #F0FDF4; color: #14532D; }
+  .diff-tag { display: inline-block; font-size: 10px; font-weight: 800; opacity: 0.75; margin-right: 7px; text-transform: uppercase; }
+  .diff-len { font-size: 10.5px; opacity: 0.7; font-weight: 700; margin-left: 6px; }
+  .diff-truncated { font-size: 11px; color: var(--gray); font-style: italic; padding: 6px 11px; background: var(--bg); border-top: 1px solid var(--border); }
+
   .modal-box.preview-modal-box { max-width: 98vw; width: 98vw; max-height: 97vh; height: 97vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; box-shadow: var(--shadow-lg); }
   .preview-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); background: #fff; }
   .preview-modal-meta { font-size: 11.5px; color: var(--gray); margin-top: 4px; max-width: 640px; }
@@ -985,20 +1001,76 @@ function renderPending(items) {
   const isAdmin = callerRole === 'admin';
   el.innerHTML = items.map(t => {
     previewMap[t.id] = t.payload || {};
-    return `
+    return t.task_type === 'approve_edit'
+      ? renderEditProposal(t, isAdmin)
+      : renderNewDraft(t, isAdmin);
+  }).join('');
+}
+
+function actionButtons(t, isAdmin, approveLabel) {
+  return isAdmin ? `
+    <button class="approve" onclick="handleApprove('${t.id}')">${approveLabel}</button>
+    <button class="reject" onclick="handleReject('${t.id}')">❌ Reject</button>
+  ` : `<div class="viewer-note">View-only account — ask an admin to approve or reject.</div>`;
+}
+
+function renderNewDraft(t, isAdmin) {
+  return `
     <div class="draft-item">
       <div class="draft-title">${escapeHtml(t.payload?.title || '(no title)')}</div>
       <div class="draft-meta">${escapeHtml(t.sites?.domain || '')} · ${new Date(t.created_at).toLocaleString()}</div>
       <div class="draft-excerpt">${escapeHtml(t.payload?.excerpt || '')}</div>
       <button class="preview-btn" onclick="openPreview('${t.id}')">👁 Preview page</button>
-      ${isAdmin ? `
-        <button class="approve" onclick="handleApprove('${t.id}')">✅ Approve &amp; Publish Live</button>
-        <button class="reject" onclick="handleReject('${t.id}')">❌ Reject</button>
-      ` : `<div class="viewer-note">View-only account — ask an admin to approve or reject.</div>`}
+      ${actionButtons(t, isAdmin, '✅ Approve &amp; Publish Live')}
       <div id="status-${t.id}" class="status-msg"></div>
     </div>
   `;
-  }).join('');
+}
+
+// Long bodies are shown truncated — the full text is still what gets applied,
+// and "Preview page" renders it in full.
+const DIFF_MAX = 600;
+
+function renderDiffValue(text, kind) {
+  const raw = text == null ? '' : String(text);
+  const clipped = raw.length > DIFF_MAX;
+  const shown = clipped ? raw.slice(0, DIFF_MAX) : raw;
+  const label = kind === 'before' ? 'Now' : 'Proposed';
+  return `
+    <div class="diff-row ${kind}">
+      <span class="diff-tag">${label}</span>${escapeHtml(shown) || '<em>(empty)</em>'}${clipped ? '…' : ''}<span class="diff-len">${raw.length} chars</span>
+    </div>`;
+}
+
+function renderEditProposal(t, isAdmin) {
+  const p = t.payload || {};
+  const changes = Array.isArray(p.changes) ? p.changes : [];
+  const touchesBody = changes.some(c => c.field === 'content');
+
+  const diffs = changes.map(c => `
+    <div class="diff-block">
+      <div class="diff-field">${escapeHtml(c.label || c.field)}</div>
+      ${renderDiffValue(c.before, 'before')}
+      ${renderDiffValue(c.after, 'after')}
+      ${String(c.after || '').length > DIFF_MAX ? '<div class="diff-truncated">Shortened for display — the full text above is what gets applied.</div>' : ''}
+    </div>`).join('');
+
+  return `
+    <div class="draft-item">
+      <div class="edit-tags">
+        <span class="tag-edit">✎ Edit</span>
+        <span class="tag-kind">${p.targetType === 'blog' ? 'Blog post' : 'Page'}</span>
+      </div>
+      <div class="draft-title">${escapeHtml(p.targetLabel || p.slug || '(untitled)')}</div>
+      <div class="draft-meta">${escapeHtml(t.sites?.domain || '')} · ${new Date(t.created_at).toLocaleString()}</div>
+      <div class="edit-url">${escapeHtml(p.targetUrl || '')}</div>
+      <div class="edit-reason"><b>Why:</b> ${escapeHtml(p.reason || 'No reason recorded.')}</div>
+      ${diffs || '<div class="empty">This proposal lists no changes.</div>'}
+      ${touchesBody ? `<button class="preview-btn" onclick="openPreview('${t.id}')">👁 Preview page</button>` : ''}
+      ${actionButtons(t, isAdmin, '✅ Approve &amp; Apply Live')}
+      <div id="status-${t.id}" class="status-msg"></div>
+    </div>
+  `;
 }
 
 // Turns an agent_results row into a readable notification card — this is
@@ -1079,8 +1151,22 @@ function renderNotifications(items) {
 // body, closing CTA) so what an admin sees here in Preview matches what
 // actually ships to the site — not a generic approximation.
 window.openPreview = function (taskId) {
-  const p = previewMap[taskId];
-  if (!p) return;
+  const raw = previewMap[taskId];
+  if (!raw) return;
+  // An edit proposal stores before/after per field rather than a whole draft;
+  // preview the PROPOSED state so the admin sees what approving would produce.
+  const p = raw.changes
+    ? (() => {
+        const pick = (f) => (raw.changes.find((c) => c.field === f) || {}).after;
+        return {
+          title: pick('meta_title') || raw.targetLabel,
+          content: pick('content'),
+          excerpt: pick('meta_desc'),
+          metaTitle: pick('meta_title'),
+          metaDescription: pick('meta_desc'),
+        };
+      })()
+    : raw;
   document.getElementById('preview-modal-title').textContent = p.title || '(no title)';
   document.getElementById('preview-modal-meta').textContent =
     `Meta title: ${p.metaTitle || '(none)'} · Meta description: ${p.metaDescription || '(none)'}`;

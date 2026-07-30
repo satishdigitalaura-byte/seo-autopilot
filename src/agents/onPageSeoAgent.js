@@ -41,7 +41,7 @@ function stripTags(html) {
     .trim();
 }
 
-function analyzeHtml(html, pageUrl, siteDomain) {
+export function analyzeHtml(html, pageUrl, siteDomain) {
   const findings = [];
 
   // <title>
@@ -106,6 +106,9 @@ function analyzeHtml(html, pageUrl, siteDomain) {
     score,
     title,
     titleLen,
+    // The description TEXT, not just its length: content_edit_agent needs the
+    // real current value to show an honest "before" in its edit proposals.
+    metaDescription: metaContent,
     metaLen,
     hasMeta: !!metaContent,
     h1Count,
@@ -120,7 +123,7 @@ function analyzeHtml(html, pageUrl, siteDomain) {
   };
 }
 
-async function fetchPageHtml(url) {
+export async function fetchPageHtml(url) {
   const res = await fetch(url, {
     signal: AbortSignal.timeout(15000),
     headers: { 'User-Agent': 'SEO-Autopilot-OnPageBot/1.0' },

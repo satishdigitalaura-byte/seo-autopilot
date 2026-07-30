@@ -6,6 +6,7 @@
 // never exposes it to the browser.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { resolveDraftTask } from '../_shared/resolveDraft.ts';
+import { resolveEditTask } from '../_shared/resolveEdit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
       // evaluates to NOT (NULL = 'true') = NULL for every task that has no
       // archived key at all — i.e. every NEW task — so Postgres filters them
       // out too and the panel goes permanently empty.
-      supabase.from('agent_tasks').select('*, sites(domain)').eq('task_type', 'approve_draft').eq('status', 'awaiting_approval').or('payload->>archived.is.null,payload->>archived.neq.true').order('created_at', { ascending: false }),
+      supabase.from('agent_tasks').select('*, sites(domain)').in('task_type', ['approve_draft', 'approve_edit']).eq('status', 'awaiting_approval').or('payload->>archived.is.null,payload->>archived.neq.true').order('created_at', { ascending: false }),
       supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').or('payload->>archived.is.null,payload->>archived.neq.true').order('created_at', { ascending: false }).limit(30),
       supabase.from('sites').select('id, domain, name').order('domain'),
       supabase.from('agent_results').select('agent_name, created_at, result').order('created_at', { ascending: false }).limit(200),
@@ -108,22 +109,23 @@ Deno.serve(async (req) => {
     // provider/name, token caps, run interval) applies to it — only agents
     // that actually call an LLM and/or run on their own schedule qualify.
     const AGENTS = [
-      { id: 'content_draft_agent', name: 'Content Draft Agent', description: 'Writes SEO-optimized blog drafts from real client results, following the full on-page checklist.', schedule: 'Every 15 minutes', configurable: true },
+      { id: 'content_draft_agent', name: 'Content Draft Agent', description: 'Writes SEO-optimized blog drafts from real client results, following the full on-page checklist.', schedule: 'On demand (when you create a topic)', configurable: true },
       { id: 'keyword_planner', name: 'Keyword Planner', description: 'Pulls real Google Ads search-volume + Search Console query data before every draft — never invented numbers.', schedule: 'Runs inside Content Draft Agent' },
-      { id: 'policy_guardrail_agent', name: 'Policy Guardrail Agent', description: 'Reviews every draft before it reaches a human — rejects spam/policy violations, sends Slack + email for approval.', schedule: 'Every 10 minutes', configurable: true },
+      { id: 'policy_guardrail_agent', name: 'Policy Guardrail Agent', description: 'Reviews every draft before it reaches a human — rejects spam/policy violations, then queues the draft for your approval in this panel.', schedule: 'On demand (right after each draft)', configurable: true },
+      { id: 'content_edit_agent', name: 'Content Edit Agent', description: 'Turns on-page audit findings into concrete edit proposals for content that is ALREADY live — rewrites a too-long title, a thin meta description, a missing canonical. Every proposal shows the exact before/after and waits for your approval here; it never touches the site on its own.', schedule: 'Weekly (Monday, after the audits)', toggleable: true, configurable: true },
       { id: 'seo_audit_agent', name: 'SEO Audit Agent', description: 'Weekly deep audit: striking-distance keywords, low-CTR pages, query movement, content gaps.', schedule: 'Weekly (Monday)' },
-      { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Daily' },
-      { id: 'content_refresh_agent', name: 'Content Refresh Agent', description: 'Picks up real traffic-drop flags from the Watcher, checks if the page is genuinely stale, and — only then — queues a data-backed refresh draft for the existing Content Draft pipeline.', schedule: 'Every 2 hours', toggleable: true },
-      { id: 'topic_discovery_agent', name: 'Topic Discovery Agent', description: 'Finds what to write next: striking-distance queries, content gaps, and trending queries from real Search Console + Keyword Planner data, ranked with strategic reasoning. Emails a ready-to-use shortlist — a human still supplies the real fact each draft needs and creates the topic.', schedule: 'Daily', toggleable: true, configurable: true },
-      { id: 'on_page_seo_agent', name: 'On-Page SEO Agent', description: 'Audits real published pages for on-page factors — title/meta length, single H1, heading hierarchy, image alt coverage, internal links, canonical + schema presence — and emails a prioritized per-page fix list. Advisory only; never edits the live site.', schedule: 'Weekly (Tuesday)', toggleable: true, configurable: true },
-      { id: 'technical_audit_agent', name: 'Technical Audit Agent', description: 'Site-wide technical SEO health from real checks: robots.txt + sitemap.xml, HTTPS, per-page canonical correctness, unique titles/meta, viewport, structured data, and real GSC index-coverage signals. Emails a report. Advisory only.', schedule: 'Weekly (Wednesday)', toggleable: true, configurable: true },
-      { id: 'eeat_agent', name: 'E-E-A-T Agent', description: 'Audits real published pages against Google\'s Experience/Expertise/Authoritativeness/Trustworthiness signals — named authors, author bio links, last-updated dates, outbound citations, About/Contact pages. Advisory only.', schedule: 'Weekly (Thursday)', toggleable: true, configurable: true },
-      { id: 'internal_linking_agent', name: 'Internal Linking Agent', description: 'Scans published posts for topical overlap and adds internal links between them automatically — pure technical work, no policy risk, so it applies directly (no approval needed).', schedule: 'Every 6 hours', toggleable: true },
-      { id: 'schema_agent', name: 'Schema Agent', description: 'Builds Article JSON-LD for every published post, plus FAQPage schema when the content genuinely contains Q&A pairs — never fabricates schema fields. Applies directly.', schedule: 'Daily', toggleable: true },
+      { id: 'gsc_ga4_watcher_agent', name: 'GSC/GA4 Watcher', description: 'Watches for real traffic drops per page and flags them for investigation.', schedule: 'Weekly (Wednesday)' },
+      { id: 'content_refresh_agent', name: 'Content Refresh Agent', description: 'Picks up real traffic-drop flags from the Watcher, checks if the page is genuinely stale, and — only then — queues a data-backed refresh draft for the existing Content Draft pipeline.', schedule: 'Every 3 days', toggleable: true },
+      { id: 'topic_discovery_agent', name: 'Topic Discovery Agent', description: 'Finds what to write next: striking-distance queries, content gaps, and trending queries from real Search Console + Keyword Planner data, ranked with strategic reasoning. Emails a ready-to-use shortlist — a human still supplies the real fact each draft needs and creates the topic.', schedule: 'Daily (11am IST)', toggleable: true, configurable: true },
+      { id: 'on_page_seo_agent', name: 'On-Page SEO Agent', description: 'Audits real published pages for on-page factors — title/meta length, single H1, heading hierarchy, image alt coverage, internal links, canonical + schema presence — and reports a prioritized per-page fix list. Advisory only; the Content Edit Agent turns its fixable findings into proposals.', schedule: 'Weekly (Monday)', toggleable: true, configurable: true },
+      { id: 'technical_audit_agent', name: 'Technical Audit Agent', description: 'Site-wide technical SEO health from real checks: robots.txt + sitemap.xml, HTTPS, per-page canonical correctness, unique titles/meta, viewport, structured data, and real GSC index-coverage signals. Advisory only.', schedule: 'Weekly (Monday)', toggleable: true, configurable: true },
+      { id: 'eeat_agent', name: 'E-E-A-T Agent', description: 'Audits real published pages against Google\'s Experience/Expertise/Authoritativeness/Trustworthiness signals — named authors, author bio links, last-updated dates, outbound citations, About/Contact pages. Advisory only.', schedule: 'Weekly (Monday)', toggleable: true, configurable: true },
+      { id: 'internal_linking_agent', name: 'Internal Linking Agent', description: 'Scans published posts for topical overlap and adds internal links between them automatically — pure technical work, no policy risk, so it applies directly (no approval needed).', schedule: 'Weekly (Wednesday)', toggleable: true },
+      { id: 'schema_agent', name: 'Schema Agent', description: 'Builds Article JSON-LD for every published post, plus FAQPage schema when the content genuinely contains Q&A pairs — never fabricates schema fields. Applies directly.', schedule: 'Weekly (Wednesday)', toggleable: true },
       { id: 'image_seo_agent', name: 'Image SEO Agent', description: 'Audits images on published posts — missing alt text, missing width/height (CLS risk), missing lazy-loading, oversized files. Advisory only.', schedule: 'Weekly (Friday)', toggleable: true },
-      { id: 'competitor_monitoring_agent', name: 'Competitor Monitoring Agent', description: 'Diffs competitor sitemaps to flag newly published competitor pages — a real content-gap signal. Needs competitor domains configured per site first.', schedule: 'Weekly (Saturday)', toggleable: true },
-      { id: 'local_seo_agent', name: 'Local SEO Agent', description: 'Checks NAP (Name/Address/Phone) consistency across the site\'s own pages. Google Business Profile review/post monitoring needs GBP credentials, not yet connected.', schedule: 'Weekly (Friday)', toggleable: true },
-      { id: 'manager_agent', name: 'Manager Agent', description: 'Watches every other agent for stale runs or error spikes — auto-pauses all automation and emails you if something looks broken.', schedule: 'Every 10 minutes' },
+      { id: 'competitor_monitoring_agent', name: 'Competitor Monitoring Agent', description: 'Diffs competitor sitemaps to flag newly published competitor pages — a real content-gap signal. Needs competitor domains configured per site first.', schedule: 'Weekly (Monday)', toggleable: true },
+      { id: 'local_seo_agent', name: 'Local SEO Agent', description: 'Checks NAP (Name/Address/Phone) consistency across the site\'s own pages. Google Business Profile review/post monitoring needs GBP credentials, not yet connected.', schedule: 'Weekly (Wednesday)', toggleable: true },
+      { id: 'manager_agent', name: 'Manager Agent', description: 'Watches every other agent for stale runs or error spikes — auto-pauses all automation and emails you if something looks broken.', schedule: 'Every 2 hours' },
     ];
     const agentSettingsMap: Record<string, boolean> = {};
     const agentConfigMap: Record<string, any> = {};
@@ -219,7 +221,12 @@ Deno.serve(async (req) => {
     });
     const { data: userData } = await userClient.auth.getUser();
     const approvedBy = userData?.user?.email || 'Panel';
-    const result = await resolveDraftTask(supabase, taskId, action, `Panel (${approvedBy})`);
+
+    // An edit targets content that is already live, so it applies differently
+    // from publishing a new draft — route by what the task actually is.
+    const { data: taskRow } = await supabase.from('agent_tasks').select('task_type').eq('id', taskId).single();
+    const resolve = taskRow?.task_type === 'approve_edit' ? resolveEditTask : resolveDraftTask;
+    const result = await resolve(supabase, taskId, action, `Panel (${approvedBy})`);
     return json(result);
   }
 
@@ -281,7 +288,7 @@ Deno.serve(async (req) => {
     // a generic switch for agents that don't check agent_settings (content
     // draft / policy guardrail / manager are controlled by the global
     // automation_paused kill-switch only, on purpose).
-    const TOGGLEABLE_AGENTS = ['topic_discovery_agent', 'on_page_seo_agent', 'technical_audit_agent'];
+    const TOGGLEABLE_AGENTS = ['topic_discovery_agent', 'on_page_seo_agent', 'technical_audit_agent', 'content_edit_agent'];
     if (!agentName || !TOGGLEABLE_AGENTS.includes(agentName)) {
       return json({ error: 'This agent cannot be toggled individually.' }, 400);
     }
@@ -306,7 +313,7 @@ Deno.serve(async (req) => {
     // Same reasoning as toggle_agent's whitelist — only agents whose code
     // actually reads agent_settings for these fields (via getAgentConfig)
     // may be configured here.
-    const CONFIGURABLE_AGENTS = ['content_draft_agent', 'policy_guardrail_agent', 'topic_discovery_agent', 'on_page_seo_agent', 'technical_audit_agent'];
+    const CONFIGURABLE_AGENTS = ['content_draft_agent', 'policy_guardrail_agent', 'topic_discovery_agent', 'on_page_seo_agent', 'technical_audit_agent', 'content_edit_agent'];
     if (!agentName || !CONFIGURABLE_AGENTS.includes(agentName)) {
       return json({ error: 'This agent has no configurable settings.' }, 400);
     }

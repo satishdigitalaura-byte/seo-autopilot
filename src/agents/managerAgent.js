@@ -60,6 +60,7 @@ const AGENT_MONITORS = {
   // interval even when healthy. intervalMin here is what a *missing*
   // workflow looks like, not the cron string itself.
   manager_agent:               { kind: 'schedule', intervalMin: 3 * HOUR, severity: 'warning'  },
+  content_edit_agent:          { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },
   gsc_ga4_watcher_agent:       { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },
   topic_discovery_agent:       { kind: 'schedule', intervalMin: DAY,     severity: 'warning'  },
   schema_agent:                { kind: 'schedule', intervalMin: 7 * DAY, severity: 'warning'  },

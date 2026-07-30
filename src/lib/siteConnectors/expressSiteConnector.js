@@ -43,6 +43,11 @@ export function updateSchema(site, payload) {
   return call(site, '/schema/update', payload);
 }
 
+/** Metadata only — a page's visible body lives in the site's React source, not the DB. */
+export function updatePageSeo(site, payload) {
+  return call(site, '/page/seo', { ...payload, approvedByHuman: true });
+}
+
 export function regenerateSitemap(site) {
   return call(site, '/sitemap/regenerate', {});
 }

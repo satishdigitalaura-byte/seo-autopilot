@@ -2,6 +2,43 @@
 // auth) — the admin panel is the only approval channel now.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// A publish only ever writes to the site's database — the site's crawler-
+// facing HTML is a separate prerendered snapshot (digital-aura-project's
+// scripts/prerender.mjs) baked at deploy time. Without this, a newly
+// approved page is live for real users immediately but invisible/wrong for
+// Googlebot and social-share previews until the *next* unrelated code
+// deploy happens to run — this is exactly what went wrong silently on
+// 2026-07-28 (see prerender.mjs's DEFAULT_TITLE check). Re-triggering the
+// site's "Deploy to Live" workflow right after a successful publish makes
+// every new/edited page get prerendered within minutes instead of waiting
+// on an unrelated deploy. Soft-fails (silently skipped) if the
+// WEBSITE_GITHUB_TOKEN function secret isn't configured — publishing itself
+// must never be blocked by this.
+async function triggerWebsitePrerender() {
+  // Falls back to the same GITHUB_TOKEN already used to trigger seo-autopilot
+  // workflows (panel-api's triggerWorkflow) — that PAT belongs to a GitHub
+  // account that already has push/PR access to the website repo (it opens
+  // PRs there today), so it very likely already has the actions:write scope
+  // this needs too, with no new secret required.
+  const token = Deno.env.get('WEBSITE_GITHUB_TOKEN') || Deno.env.get('GITHUB_TOKEN');
+  const repo = Deno.env.get('WEBSITE_GITHUB_REPO') || 'swayamdigitalaura-gif/digitalaura-website';
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/deploy.yml/dispatches`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { target: 'main-site' } }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveDraftTask(
   supabase: ReturnType<typeof createClient>,
   taskId: string,
@@ -58,9 +95,14 @@ export async function resolveDraftTask(
       }),
     });
     const json = await res.json();
-    publishNote = res.ok
-      ? `Published live on ${site.domain}.`
-      : `Approved, but the site publish call failed: ${json.error || res.status}. Contact the developer.`;
+    if (res.ok) {
+      const prerenderTriggered = await triggerWebsitePrerender();
+      publishNote = prerenderTriggered
+        ? `Published live on ${site.domain}. Rebuilding the site now so this page is fully crawlable for Google — live in a few minutes.`
+        : `Published live on ${site.domain}. Note: could not auto-trigger the site rebuild (WEBSITE_GITHUB_TOKEN not configured) — this page will only be fully crawlable after the next site deploy.`;
+    } else {
+      publishNote = `Approved, but the site publish call failed: ${json.error || res.status}. Contact the developer.`;
+    }
   } catch (e) {
     publishNote = `Approved, but could not reach the site to save the draft: ${(e as Error).message}`;
   }
