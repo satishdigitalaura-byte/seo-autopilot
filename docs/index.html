@@ -286,6 +286,24 @@
   .kw-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .kw-chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #EEF2FF; color: #4338CA; }
   .kw-chip.primary { background: #DCFCE7; color: #15803D; }
+
+  /* Keyword Tracker tab */
+  .kw-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .kw-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-light); padding: 8px 10px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+  .kw-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--dark); }
+  .kw-table tbody tr:last-child td { border-bottom: none; }
+  .kw-table tbody tr:hover { background: var(--bg); }
+
+  /* Automation Runs card (Activity tab) */
+  .runs-list { display: flex; flex-direction: column; gap: 2px; }
+  .run-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .run-row:last-child { border-bottom: none; }
+  .run-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .run-info { min-width: 0; }
+  .run-name { font-size: 13px; font-weight: 700; }
+  .run-name a { color: var(--dark); text-decoration: none; }
+  .run-name a:hover { color: var(--accent2); text-decoration: underline; }
+  .run-meta { font-size: 11.5px; color: var(--gray); margin-top: 2px; }
   button.approve { background: linear-gradient(135deg,#16A34A,var(--green)); color: #fff; border: none; padding: 8px 15px; border-radius: 9px; cursor: pointer; font-weight: 700; margin-right: 8px; font-size: 12.5px; transition: filter 0.15s, transform 0.1s; box-shadow: 0 4px 12px rgba(34,197,94,0.25); }
   button.reject { background: linear-gradient(135deg,#DC2626,var(--red)); color: #fff; border: none; padding: 8px 15px; border-radius: 9px; cursor: pointer; font-weight: 700; font-size: 12.5px; transition: filter 0.15s, transform 0.1s; box-shadow: 0 4px 12px rgba(239,68,68,0.2); }
   button.approve:hover, button.reject:hover { filter: brightness(1.06); transform: translateY(-1px); }
@@ -451,6 +469,7 @@
       <a class="active" data-tab="dashboard" onclick="showTab('dashboard')"><span class="ic">▦</span> Dashboard</a>
       <a data-tab="agents" onclick="showTab('agents')"><span class="ic">🤖</span> Agents</a>
       <a data-tab="approvals" onclick="showTab('approvals')"><span class="ic">✅</span> Approvals</a>
+      <a data-tab="keywords" onclick="showTab('keywords')"><span class="ic">🔑</span> Keywords</a>
       <a data-tab="team" onclick="showTab('team')"><span class="ic">👥</span> Team</a>
       <a data-tab="activity" onclick="showTab('activity')"><span class="ic">🕒</span> Activity</a>
       <a title="Not built yet"><span class="ic">📊</span> Analytics</a>
@@ -526,6 +545,16 @@
         </div>
       </div>
 
+      <!-- ===== KEYWORDS TAB ===== -->
+      <div class="tab-panel" data-tab="keywords">
+        <div class="page-title">Keyword Tracker</div>
+        <div class="card" id="keywords-card">
+          <div class="card-head"><div><span class="eyebrow">Pipeline</span><h2>Every keyword currently in play</h2></div></div>
+          <p style="font-size:12.5px;color:var(--gray);margin:-6px 0 16px;">From a suggested idea through drafting, your approval, and publishing — one row per keyword, newest first.</p>
+          <div id="keywords-list"><div class="empty">Loading…</div></div>
+        </div>
+      </div>
+
       <!-- ===== TEAM TAB ===== -->
       <div class="tab-panel" data-tab="team">
         <div class="page-title">Team & Access</div>
@@ -549,6 +578,10 @@
       <!-- ===== ACTIVITY TAB ===== -->
       <div class="tab-panel" data-tab="activity">
         <div class="page-title">Recent Activity</div>
+        <div class="card" id="automation-runs-card">
+        <div class="card-head"><div><span class="eyebrow">GitHub Actions</span><h2>Automation runs</h2></div></div>
+        <div id="automation-runs-list"><div class="empty">Loading…</div></div>
+        </div>
         <div class="card" id="notifications-card">
         <div class="card-head"><div><span class="eyebrow">Findings</span><h2>Notifications</h2></div></div>
         <div id="notifications-list"><div class="empty">Loading…</div></div>
@@ -783,7 +816,66 @@ async function loadData() {
   renderRecent();
   renderNotifications(data.notifications || []);
   renderSites(data.sites || []);
+  renderKeywordTracker(data.keywordTracker || []);
   loadUsers();
+  loadAutomationRuns();
+}
+
+function renderKeywordTracker(items) {
+  const el = document.getElementById('keywords-list');
+  if (!items.length) {
+    el.innerHTML = `<div class="empty-state"><div class="ic">🔑</div><b>No keywords yet</b><p>Once Topic Discovery or Content Draft runs, every keyword in play shows up here.</p></div>`;
+    return;
+  }
+  const badgeColor = { good: '#16A34A', warning: '#D97706', bad: '#DC2626', info: '#4338CA', idea: '#6B7280' };
+  el.innerHTML = `
+    <table class="kw-table">
+      <thead><tr><th>Keyword</th><th>Title</th><th>Stage</th><th>Site</th><th>Date</th></tr></thead>
+      <tbody>
+        ${items.map(k => `
+          <tr>
+            <td><span class="kw-chip primary">${escapeHtml(k.keyword)}</span></td>
+            <td>${escapeHtml(k.title || '—')}</td>
+            <td><span style="color:${badgeColor[k.badge] || '#6B7280'};font-weight:700;">${escapeHtml(k.stage)}</span>${k.reasoning ? `<br><span style="font-size:11px;color:var(--gray);font-weight:400;">${escapeHtml(k.reasoning)}</span>` : ''}</td>
+            <td style="font-size:12px;color:var(--gray);">${escapeHtml(k.site || '—')}</td>
+            <td style="font-size:12px;color:var(--gray);white-space:nowrap;">${new Date(k.date).toLocaleDateString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function loadAutomationRuns() {
+  const el = document.getElementById('automation-runs-list');
+  try {
+    const data = await callPanelApi({ action: 'automation_runs' });
+    if (!data.configured) {
+      el.innerHTML = `<div class="empty">GitHub token not configured for this view — automation is still running, this is just the status widget.</div>`;
+      return;
+    }
+    if (!data.runs?.length) {
+      el.innerHTML = `<div class="empty">No recent workflow runs found.</div>`;
+      return;
+    }
+    const dot = (r) => r.status !== 'completed' ? '#D97706' : r.conclusion === 'success' ? '#16A34A' : r.conclusion === 'failure' ? '#DC2626' : '#6B7280';
+    const label = (r) => r.status !== 'completed' ? 'Running…' : (r.conclusion || r.status);
+    el.innerHTML = `
+      <div class="runs-list">
+        ${data.runs.map(r => `
+          <div class="run-row">
+            <span class="run-dot" style="background:${dot(r)};"></span>
+            <div class="run-info">
+              <div class="run-name"><a href="${escapeHtml(r.url)}" target="_blank" rel="noreferrer">${escapeHtml(r.name)}</a></div>
+              <div class="run-meta">${escapeHtml(r.repo)} · ${label(r)} · ${new Date(r.createdAt).toLocaleString()}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (err) {
+    el.innerHTML = `<div class="empty">Could not load automation runs: ${escapeHtml(err.message)}</div>`;
+  }
 }
 
 function renderPausedBanner(status) {
@@ -1103,16 +1195,25 @@ function summarizeNotification(n) {
         badge: r.issueCount === 0 ? 'good' : 'warning', title: `Technical audit — ${r.issueCount ?? 0} issue(s) across ${r.pagesChecked ?? 0} pages`,
         body: r.summary ? `<p>${escapeHtml(r.summary)}</p>` : (r.issues?.length ? `<ul>${r.issues.slice(0, 6).map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''),
       };
-    case 'on_page_seo_agent':
+    case 'on_page_seo_agent': {
+      // Worst pages first — a generic avg score tells you nothing actionable;
+      // the actual per-page findings are what an admin needs to see to know
+      // WHY a page scored low and whether it's worth a content_edit_agent fix.
+      const worst = (r.pages || []).filter(p => p.findings?.length).sort((a, b) => a.score - b.score).slice(0, 3);
       return {
         badge: (r.averageScore ?? 0) >= 80 ? 'good' : 'warning', title: `On-page SEO — avg score ${r.averageScore ?? '?'}/100 across ${r.pagesAudited ?? 0} pages`,
-        body: r.summary ? `<p>${escapeHtml(r.summary)}</p>` : '',
+        body: worst.length
+          ? `<ul>${worst.map(p => `<li><b>${escapeHtml(p.url)}</b> (${p.score}/100)<br><span style="color:var(--gray);">${p.findings.slice(0, 3).map(f => escapeHtml(f)).join(' • ')}</span></li>`).join('')}</ul>`
+          : (r.summary ? `<p>${escapeHtml(r.summary)}</p>` : ''),
       };
-    case 'seo_audit_agent':
+    }
+    case 'seo_audit_agent': {
+      const topQueries = (r.strikingDistance || []).slice(0, 5);
       return {
         badge: 'info', title: `SEO audit — ${r.strikingDistance?.length ?? 0} striking-distance opportunities`,
-        body: `<p>${r.underperformingCtr?.length ?? 0} pages with below-expected CTR · ${r.contentGapCount ?? 0} content gaps found.</p>`,
+        body: `${topQueries.length ? `<div class="kw-row">${topQueries.map(q => `<span class="kw-chip primary">${escapeHtml(q.query)} · pos ${Math.round(q.position)}</span>`).join(' ')}</div>` : ''}<p>${r.underperformingCtr?.length ?? 0} pages with below-expected CTR · ${r.contentGapCount ?? 0} content gaps found.</p>`,
       };
+    }
     // Both spellings: the watcher logged the short name for months before the
     // canonical '..._agent' id, and those older rows still show in this feed.
     case 'gsc_ga4_watcher':

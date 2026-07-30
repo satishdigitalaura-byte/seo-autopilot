@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
   const action = body.action as string;
 
   if (action === 'list') {
-    const [{ data: pending }, { data: recent }, { data: sites }, { data: results }, { data: sysStatus }, { data: agentSettingsRows }] = await Promise.all([
+    const [{ data: pending }, { data: recent }, { data: sites }, { data: results }, { data: sysStatus }, { data: agentSettingsRows }, { data: keywordTasks }] = await Promise.all([
       // `archived` in the payload hides old test/superseded runs from the panel
       // WITHOUT deleting them — the rows stay in the table and the flag can be
       // cleared to bring any of them back.
@@ -97,9 +97,15 @@ Deno.serve(async (req) => {
       supabase.from('agent_tasks').select('*, sites(domain)').in('task_type', ['approve_draft', 'approve_edit']).eq('status', 'awaiting_approval').or('payload->>archived.is.null,payload->>archived.neq.true').order('created_at', { ascending: false }),
       supabase.from('agent_tasks').select('id, task_type, source_agent, target_agent, status, created_at, completed_at, error_message, sites(domain)').or('payload->>archived.is.null,payload->>archived.neq.true').order('created_at', { ascending: false }).limit(30),
       supabase.from('sites').select('id, domain, name').order('domain'),
-      supabase.from('agent_results').select('agent_name, created_at, result').order('created_at', { ascending: false }).limit(200),
+      supabase.from('agent_results').select('agent_name, site_id, created_at, result').order('created_at', { ascending: false }).limit(200),
       supabase.from('system_status').select('*').eq('id', 1).single(),
       supabase.from('agent_settings').select('*'),
+      // Every task in the content pipeline that carries a real target keyword —
+      // this is the raw material for the panel's Keyword Tracker tab.
+      supabase.from('agent_tasks').select('id, task_type, status, payload, created_at, sites(domain)')
+        .in('task_type', ['draft_new', 'draft_refresh', 'approve_draft'])
+        .not('payload->>targetKeyword', 'is', null)
+        .order('created_at', { ascending: false }).limit(150),
     ]);
 
     // Known agents this system runs, with static metadata (schedule/description
@@ -178,7 +184,101 @@ Deno.serve(async (req) => {
     // just surface the same data here instead of it only ever reaching an inbox.
     const notifications = (results || []).slice(0, 60);
 
-    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null, notifications });
+    // Keyword Tracker — one row per keyword actually in play, newest task
+    // wins so a keyword shows its current stage (idea -> drafted -> awaiting
+    // approval -> published/rejected), not every historical attempt at it.
+    const STAGE_BY_TASK: Record<string, { stage: string; badge: string }> = {
+      draft_new: { stage: 'Queued for drafting', badge: 'info' },
+      draft_refresh: { stage: 'Refresh queued', badge: 'info' },
+    };
+    const STAGE_BY_STATUS: Record<string, { stage: string; badge: string }> = {
+      pending: { stage: 'Queued', badge: 'info' },
+      awaiting_approval: { stage: 'Awaiting your approval', badge: 'warning' },
+      completed: { stage: 'Published live', badge: 'good' },
+      rejected: { stage: 'Rejected', badge: 'bad' },
+      failed: { stage: 'Failed', badge: 'bad' },
+    };
+    const keywordMap = new Map<string, any>();
+    for (const t of keywordTasks || []) {
+      const kw = ((t.payload as any)?.targetKeyword || '').trim();
+      if (!kw) continue;
+      const key = kw.toLowerCase();
+      if (keywordMap.has(key)) continue; // first hit is the newest (query is ordered desc)
+      const stageInfo = STAGE_BY_STATUS[t.status] || STAGE_BY_TASK[t.task_type] || { stage: t.status, badge: 'info' };
+      keywordMap.set(key, {
+        keyword: kw,
+        title: (t.payload as any)?.title || (t.payload as any)?.suggestedTitle || null,
+        stage: stageInfo.stage,
+        badge: stageInfo.badge,
+        site: (t as any).sites?.domain || null,
+        date: t.created_at,
+      });
+    }
+    // Fold in each site's latest topic-discovery ideas that never became a
+    // task yet — otherwise a keyword an admin hasn't acted on is invisible
+    // here even though it's exactly what "operate the agents" needs to see.
+    const seenTopicSites = new Set<string>();
+    for (const r of results || []) {
+      if (r.agent_name !== 'topic_discovery_agent') continue;
+      if (seenTopicSites.has((r as any).site_id)) continue; // only the newest run per site
+      const picks = (r.result as any)?.topPicks;
+      if (!Array.isArray(picks)) continue;
+      seenTopicSites.add((r as any).site_id);
+      for (const p of picks) {
+        const kw = (p.targetKeyword || '').trim();
+        if (!kw || keywordMap.has(kw.toLowerCase())) continue; // already further along the pipeline
+        keywordMap.set(kw.toLowerCase(), {
+          keyword: kw,
+          title: p.suggestedTitle || null,
+          stage: 'Suggested idea — not started',
+          badge: 'idea',
+          site: null,
+          date: r.created_at,
+          reasoning: p.strategicReasoning || null,
+        });
+      }
+    }
+    const keywordTracker = Array.from(keywordMap.values()).sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 100);
+
+    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null, notifications, keywordTracker });
+  }
+
+  if (action === 'automation_runs') {
+    // Recent GitHub Actions runs for both repos this system depends on — the
+    // panel's own view of "are the agents actually running", so an admin
+    // never has to leave the panel to check GitHub. Soft-fails to an empty
+    // list per repo if GITHUB_TOKEN isn't configured or the API call fails;
+    // this must never break the rest of the panel.
+    async function fetchRuns(repo: string, token: string) {
+      try {
+        const res = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=8`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.workflow_runs || []).map((r: any) => ({
+          repo,
+          name: r.name,
+          status: r.status, // queued | in_progress | completed
+          conclusion: r.conclusion, // success | failure | cancelled | null
+          createdAt: r.created_at,
+          url: r.html_url,
+        }));
+      } catch {
+        return [];
+      }
+    }
+
+    const token = Deno.env.get('GITHUB_TOKEN');
+    if (!token) return json({ runs: [], configured: false });
+
+    const repos = [
+      Deno.env.get('GITHUB_REPO') || 'satishdigitalaura-byte/seo-autopilot',
+      Deno.env.get('WEBSITE_GITHUB_REPO') || 'swayamdigitalaura-gif/digitalaura-website',
+    ];
+    const runsPerRepo = await Promise.all(repos.map((r) => fetchRuns(r, token)));
+    const runs = runsPerRepo.flat().sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 15);
+    return json({ runs, configured: true });
   }
 
   if (action === 'pause_automation') {
