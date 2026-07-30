@@ -170,12 +170,28 @@ ${linkList}
 27. ENGAGEMENT ELEMENTS: use a comparison table, numbered steps, or definition callout somewhere if the topic genuinely supports it (skip if it would feel forced).
 28. TECHNICAL HYGIENE: only real internal links, only real/well-known external links, clean semantic HTML, no broken markup, no placeholder text left in.
 29. NO BACKLINK/LINK-BUILDING CLAIMS: this agency does NOT offer backlink building / link building / off-page link acquisition as a service. Never mention "backlinks", "link building", or claim/imply that service anywhere in the title, keywords, FAQs, or body — not even as a generic SEO-tips mention. If it would naturally come up, skip it or replace it with an on-page/technical/local SEO point instead.
-30. VISUAL DESIGN HOOKS — MANDATORY WRAPPER CLASSES: right now the site renders your HTML with no visual treatment at all (looks like a plain copy-pasted document), so use these exact wrapper elements/classes wherever they genuinely fit — the site's CSS targets these classes to render them as styled boxes:
+30. VISUAL DESIGN HOOKS — MANDATORY WRAPPER CLASSES: right now the site renders your HTML with no visual treatment at all (looks like a plain copy-pasted document), so use these exact wrapper elements/classes wherever they genuinely fit — the site's CSS targets these classes to render them as styled boxes. Copy the markup shapes below EXACTLY (same tags, same class names, same nesting) — the CSS only matches these specific structures:
     - Wrap the single biggest stat/result from the ORIGINAL ELEMENT (e.g. "15,000 additional sessions") in <div class="da-stat-callout">...</div> — one per article, placed early, ideally right after the intro.
     - Wrap a 2-4 bullet "key takeaway" summary in <div class="da-key-takeaway"><strong>Key takeaway:</strong><ul>...</ul></div> — place after the first or second H2.
     - Wrap any direct claim/result quote in <blockquote class="da-pullquote">...</blockquote> instead of a plain <p>.
     - Wrap the final CTA paragraph in <div class="da-cta-box">...</div> instead of a bare <p>.
     - Never use inline style="" or <font> — only these class names, so the site's own CSS controls the actual look.
+30b. RICHER STRUCTURED BLOCKS — use whichever of these genuinely fit the topic (do not force one that doesn't apply; most articles need 2-4 of these across the piece, on top of the rule-30 blocks above). These directly serve rule 26 (AIO/GEO extraction) and rule 27 (engagement elements) — a comparison table or numbered steps is what AI Overviews quote most, so prefer these exact markup shapes over a plain paragraph wherever the content naturally compares options or lists a sequence:
+    - COMPARISON TABLE (satisfies rule 26's "structured block" requirement when the topic compares options):
+      <table class="da-comparison-table"><thead><tr><th>Row label</th><th>Option A</th><th>Option B</th></tr></thead><tbody><tr><td>Feature</td><td>Value</td><td>Value</td></tr></tbody></table>
+    - STAT CARDS ROW (2-4 metrics tied to the ORIGINAL ELEMENT, placed once near the top):
+      <div class="da-stat-grid"><div class="da-stat-item"><span class="da-stat-value">38%</span><span class="da-stat-label">Short label</span><span class="da-stat-sub">optional context</span></div></div>
+    - NUMBERED PROCESS STEPS (satisfies rule 26's "numbered step sequence" for how-to/decision-framework content):
+      <div class="da-process-steps"><div class="da-step"><span class="da-step-n">1</span><strong>Step title</strong><p>Step detail.</p></div></div>
+    - TIMELINE (only for content describing a sequence over time, e.g. a case study or rollout):
+      <div class="da-timeline"><div class="da-timeline-item"><span class="da-timeline-period">Week 1-2</span><strong class="da-timeline-title">Phase title</strong><p>What happened.</p></div></div>
+    - PROS / CONS (only when genuinely weighing two sides of a decision):
+      <div class="da-pros-cons"><div class="da-pros"><h4>Pros</h4><ul><li>...</li></ul></div><div class="da-cons"><h4>Cons</h4><ul><li>...</li></ul></div></div>
+    - CALLOUT BOX (use da-callout-tip for a helpful aside, da-callout-warning for something readers must not skip, da-callout-note for a neutral caveat — never more than 2-3 total in one article):
+      <div class="da-callout da-callout-tip"><strong>Pro tip</strong><p>...</p></div>
+    - CHECKLIST CARD (a decision checklist, e.g. "choose X if…"):
+      <div class="da-checklist"><h4>Choose this if…</h4><ul><li>...</li></ul></div>
+    Never invent new class names — only the ones listed in rule 30 and 30b exist in the site's CSS; an unrecognized class renders as unstyled plain text.
 ${templateGuidance ? `31. CONTENT TYPE STRUCTURE (${blogType.replace('_', ' ')}) — mandatory H2/H3 organization for this piece, on top of every rule above:\n${templateGuidance}` : ''}
 
 TOPIC: ${topic}
