@@ -281,6 +281,11 @@
   .draft-title { font-weight: 700; color: var(--dark); margin-bottom: 4px; font-size: 14px; }
   .draft-meta { font-size: 11.5px; color: var(--gray); margin-bottom: 10px; }
   .draft-excerpt { font-size: 13px; color: #374151; margin-bottom: 12px; line-height: 1.5; }
+  /* Target keyword(s) — shown on drafts/notifications so an admin can see
+     exactly what a piece is written for before approving it. */
+  .kw-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .kw-chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #EEF2FF; color: #4338CA; }
+  .kw-chip.primary { background: #DCFCE7; color: #15803D; }
   button.approve { background: linear-gradient(135deg,#16A34A,var(--green)); color: #fff; border: none; padding: 8px 15px; border-radius: 9px; cursor: pointer; font-weight: 700; margin-right: 8px; font-size: 12.5px; transition: filter 0.15s, transform 0.1s; box-shadow: 0 4px 12px rgba(34,197,94,0.25); }
   button.reject { background: linear-gradient(135deg,#DC2626,var(--red)); color: #fff; border: none; padding: 8px 15px; border-radius: 9px; cursor: pointer; font-weight: 700; font-size: 12.5px; transition: filter 0.15s, transform 0.1s; box-shadow: 0 4px 12px rgba(239,68,68,0.2); }
   button.approve:hover, button.reject:hover { filter: brightness(1.06); transform: translateY(-1px); }
@@ -1015,11 +1020,18 @@ function actionButtons(t, isAdmin, approveLabel) {
 }
 
 function renderNewDraft(t, isAdmin) {
+  const p = t.payload || {};
+  const secondaryKw = String(p.keywords || '').split(',').map(k => k.trim()).filter(Boolean).slice(0, 5);
+  const kwChips = [
+    p.targetKeyword ? `<span class="kw-chip primary">${escapeHtml(p.targetKeyword)}</span>` : '',
+    ...secondaryKw.filter(k => k.toLowerCase() !== (p.targetKeyword || '').toLowerCase()).map(k => `<span class="kw-chip">${escapeHtml(k)}</span>`),
+  ].filter(Boolean).join(' ');
   return `
     <div class="draft-item">
-      <div class="draft-title">${escapeHtml(t.payload?.title || '(no title)')}</div>
+      <div class="draft-title">${escapeHtml(p.title || '(no title)')}</div>
       <div class="draft-meta">${escapeHtml(t.sites?.domain || '')} · ${new Date(t.created_at).toLocaleString()}</div>
-      <div class="draft-excerpt">${escapeHtml(t.payload?.excerpt || '')}</div>
+      ${kwChips ? `<div class="kw-row">${kwChips}</div>` : ''}
+      <div class="draft-excerpt">${escapeHtml(p.excerpt || '')}</div>
       <button class="preview-btn" onclick="openPreview('${t.id}')">👁 Preview page</button>
       ${actionButtons(t, isAdmin, '✅ Approve &amp; Publish Live')}
       <div id="status-${t.id}" class="status-msg"></div>
@@ -1084,7 +1096,7 @@ function summarizeNotification(n) {
       if (r.decision !== 'suggestions_ready' || !r.topPicks?.length) return null;
       return {
         badge: 'good', title: `${r.topPicks.length} new topic idea${r.topPicks.length === 1 ? '' : 's'} found`,
-        body: `<ul>${r.topPicks.map(p => `<li><b>${escapeHtml(p.suggestedTitle || p.targetKeyword)}</b> — priority ${p.priorityScore}/10 · ${escapeHtml(p.opportunityType || '')}</li>`).join('')}</ul>`,
+        body: `<ul>${r.topPicks.map(p => `<li><b>${escapeHtml(p.suggestedTitle || p.targetKeyword)}</b> <span class="kw-chip primary">${escapeHtml(p.targetKeyword || '')}</span> — priority ${p.priorityScore}/10 · ${escapeHtml(p.opportunityType || '')}${p.strategicReasoning ? `<br><span style="color:var(--gray);font-weight:400;">${escapeHtml(p.strategicReasoning)}</span>` : ''}</li>`).join('')}</ul>`,
       };
     case 'technical_audit_agent':
       return {
@@ -1111,9 +1123,19 @@ function summarizeNotification(n) {
         title: r.findingsCount > 0 ? `${r.findingsCount} page(s) lost significant traffic` : 'All clear — no traffic drops',
         body: r.findingsCount > 0 ? `<ul>${(r.findings || []).slice(0, 5).map(f => `<li>${escapeHtml(f.url)} — ${f.changePct}%</li>`).join('')}</ul>` : '',
       };
-    case 'content_draft_agent':
+    case 'content_draft_agent': {
       if (!r.draft) return null;
-      return { badge: 'info', title: `Draft ready: ${escapeHtml(r.draft.title || '(no title)')}`, body: `<p>${(r.imagesGenerated ?? 0)} image(s) generated · ${r.contentLength ?? 0} characters. See Approvals tab to review.</p>` };
+      const primaryKw = r.keywordResearch?.primaryKeyword;
+      const secondaryKw = (r.keywordResearch?.secondaryKeywords || []).slice(0, 4);
+      const kwChips = [
+        primaryKw ? `<span class="kw-chip primary">${escapeHtml(primaryKw)}</span>` : '',
+        ...secondaryKw.map(k => `<span class="kw-chip">${escapeHtml(k)}</span>`),
+      ].filter(Boolean).join(' ');
+      return {
+        badge: 'info', title: `Draft ready: ${escapeHtml(r.draft.title || '(no title)')}`,
+        body: `${kwChips ? `<div class="kw-row">${kwChips}</div>` : ''}<p>${(r.imagesGenerated ?? 0)} image(s) generated · ${r.contentLength ?? 0} characters. See Approvals tab to review.</p>`,
+      };
+    }
     case 'manager_agent':
       if (r.decision === 'warning') {
         // Advisory agents that went quiet. Automation is still running, so
