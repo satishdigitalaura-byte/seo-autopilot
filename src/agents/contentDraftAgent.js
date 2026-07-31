@@ -191,6 +191,16 @@ ${linkList}
       <div class="da-callout da-callout-tip"><strong>Pro tip</strong><p>...</p></div>
     - CHECKLIST CARD (a decision checklist, e.g. "choose X if…"):
       <div class="da-checklist"><h4>Choose this if…</h4><ul><li>...</li></ul></div>
+    - FEATURE CARDS (2-4 short capability/benefit highlights in a grid, no numbering or sequence implied):
+      <div class="da-feature-cards"><div class="da-feature-item"><h4>Feature title</h4><p>Short benefit description.</p></div></div>
+    - INFORMATION CARD (one titled card framing a decision or context, with supporting bullet points — use instead of a checklist when the list isn't a yes/no checklist):
+      <div class="da-info-card"><h4>Card title</h4><p>Optional one-line description.</p><ul><li>...</li></ul></div>
+    - NUMBER CARDS (2-3 short "key factors" or "things to remember" summary cards, distinct from numbered process steps because there's no sequence/order to follow):
+      <div class="da-number-cards"><div class="da-number-item"><span class="da-number-n">1</span><h4>Factor title</h4><p>Short explanation.</p></div></div>
+    - CALLOUT SECTION (one full-width closing/framing box for a major section, larger than a callout box — use once per article at most, e.g. to set up "what's next"):
+      <div class="da-callout-section"><h4>Section title</h4><p>Framing copy.</p></div>
+    - FAQ ACCORDION (use for the "Frequently asked questions" section instead of plain H3/paragraph pairs — each question must be a genuine, distinct question a reader would search):
+      <div class="da-faq"><details class="da-faq-item"><summary>Question text?</summary><p>Answer text.</p></details></div>
     Never invent new class names — only the ones listed in rule 30 and 30b exist in the site's CSS; an unrecognized class renders as unstyled plain text.
 ${templateGuidance ? `31. CONTENT TYPE STRUCTURE (${blogType.replace('_', ' ')}) — mandatory H2/H3 organization for this piece, on top of every rule above:\n${templateGuidance}` : ''}
 
