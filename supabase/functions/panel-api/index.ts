@@ -131,6 +131,7 @@ Deno.serve(async (req) => {
       { id: 'image_seo_agent', name: 'Image SEO Agent', description: 'Audits images on published posts — missing alt text, missing width/height (CLS risk), missing lazy-loading, oversized files. Advisory only.', schedule: 'Weekly (Friday)', toggleable: true },
       { id: 'competitor_monitoring_agent', name: 'Competitor Monitoring Agent', description: 'Diffs competitor sitemaps to flag newly published competitor pages — a real content-gap signal. Needs competitor domains configured per site first.', schedule: 'Weekly (Monday)', toggleable: true },
       { id: 'local_seo_agent', name: 'Local SEO Agent', description: 'Checks NAP (Name/Address/Phone) consistency across the site\'s own pages. Google Business Profile review/post monitoring needs GBP credentials, not yet connected.', schedule: 'Weekly (Wednesday)', toggleable: true },
+      { id: 'analytics_snapshot_agent', name: 'Analytics Snapshot Agent', description: 'Pulls real GSC clicks/impressions, GA4 sessions/conversions, published content counts, and lead totals into the Analytics tab. Read-only — never changes anything on the site.', schedule: 'Daily' },
       { id: 'manager_agent', name: 'Manager Agent', description: 'Watches every other agent for stale runs or error spikes — auto-pauses all automation and emails you if something looks broken.', schedule: 'Every 2 hours' },
     ];
     const agentSettingsMap: Record<string, boolean> = {};
@@ -262,7 +263,19 @@ Deno.serve(async (req) => {
     }
     const keywordTracker = Array.from(keywordMap.values()).sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 100);
 
-    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null, notifications, keywordTracker });
+    // Analytics tab — latest snapshot per site (one row from analytics_snapshot_agent).
+    const { data: analyticsRows } = await supabase
+      .from('agent_results').select('site_id, created_at, result, sites(domain)')
+      .eq('agent_name', 'analytics_snapshot_agent')
+      .order('created_at', { ascending: false }).limit(20);
+    const seenAnalyticsSites = new Set<string>();
+    const analytics = (analyticsRows || []).filter((r: any) => {
+      if (seenAnalyticsSites.has(r.site_id)) return false;
+      seenAnalyticsSites.add(r.site_id);
+      return true;
+    });
+
+    return json({ pending: pending || [], recent: recent || [], sites: sites || [], agents, callerRole, systemStatus: sysStatus || null, notifications, keywordTracker, analytics });
   }
 
   if (action === 'automation_runs') {

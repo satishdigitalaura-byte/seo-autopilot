@@ -48,6 +48,11 @@ export function updatePageSeo(site, payload) {
   return call(site, '/page/seo', { ...payload, approvedByHuman: true });
 }
 
+/** Read-only counts (published blogs/pages, lead totals) for the Analytics tab. */
+export function getAnalyticsSummary(site) {
+  return call(site, '/analytics/summary', {});
+}
+
 export function regenerateSitemap(site) {
   return call(site, '/sitemap/regenerate', {});
 }

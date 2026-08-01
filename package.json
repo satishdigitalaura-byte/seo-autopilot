@@ -20,7 +20,8 @@
     "image-seo:run": "node src/runners/runImageSeo.js",
     "competitor-monitoring:run": "node src/runners/runCompetitorMonitoring.js",
     "local-seo:run": "node src/runners/runLocalSeo.js",
-    "edit:run": "node src/runners/runContentEdit.js"
+    "edit:run": "node src/runners/runContentEdit.js",
+    "analytics:run": "node src/runners/runAnalyticsSnapshot.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

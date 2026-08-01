@@ -51,6 +51,17 @@ export async function getPageSessions(propertyId, startDate, endDate) {
 }
 
 /**
+ * Site-wide sessions + conversions for one date range — no per-page
+ * breakdown, just the totals the Analytics tab shows (e.g. "30-day traffic").
+ */
+export async function getSiteTotals(propertyId, startDate, endDate) {
+  const byPage = await getPageSessions(propertyId, startDate, endDate);
+  let sessions = 0, conversions = 0;
+  for (const m of byPage.values()) { sessions += m.sessions; conversions += m.conversions; }
+  return { sessions, conversions };
+}
+
+/**
  * CRO signal: pages that bring meaningful traffic but convert poorly (or not
  * at all). High traffic + low conversion is exactly where a content/CTA
  * change has the most leverage — fixing a low-traffic page's conversion rate

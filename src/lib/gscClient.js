@@ -42,6 +42,18 @@ function fmtDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
+/** Site-wide clicks + impressions for one date range — no page dimension, just the totals. */
+export async function getSiteTotals(propertyUrl, startDate, endDate) {
+  const authClient = await getGoogleAuthClient(SCOPES);
+  const searchconsole = google.searchconsole({ version: 'v1', auth: authClient });
+  const res = await searchconsole.searchanalytics.query({
+    siteUrl: propertyUrl,
+    requestBody: { startDate, endDate },
+  });
+  const row = (res.data.rows || [])[0];
+  return { clicks: row?.clicks || 0, impressions: row?.impressions || 0, ctr: row?.ctr || 0, position: row?.position || 0 };
+}
+
 /**
  * "Striking distance" keywords — queries ranking position 4-20 with real
  * impression volume. This is one of the highest-leverage SEO moves: pushing
