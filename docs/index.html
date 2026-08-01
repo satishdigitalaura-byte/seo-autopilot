@@ -435,9 +435,52 @@
   .paused-banner p { color: #7F1D1D; font-size: 12.5px; margin: 0 0 10px; line-height: 1.5; }
   .paused-banner button { background: #991B1B; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
   .paused-banner button:hover { background: #7F1D1D; }
+
+  /* ---------- Toasts ---------- */
+  #toast-stack { position: fixed; top: 18px; right: 18px; z-index: 999; display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
+  .toast {
+    background: var(--dark); color: #fff; padding: 13px 16px; border-radius: 12px; font-size: 13px; font-weight: 600;
+    box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 10px;
+    animation: toast-in 0.22s ease-out; line-height: 1.4;
+  }
+  .toast.ok { background: linear-gradient(135deg, #16A34A, #22C55E); }
+  .toast.error { background: linear-gradient(135deg, #DC2626, #EF4444); }
+  .toast .ic { font-size: 16px; flex-shrink: 0; }
+  .toast.leaving { animation: toast-out 0.18s ease-in forwards; }
+  @keyframes toast-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes toast-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(24px); } }
+
+  /* ---------- Live sync indicator ---------- */
+  .pill.live-syncing { opacity: 0.65; }
+  .pill .sync-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* ---------- Compose wizard ---------- */
+  .wizard-steps { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
+  .wizard-steps .wstep { flex: 1; height: 5px; border-radius: 4px; background: var(--border); transition: background 0.2s; }
+  .wizard-steps .wstep.done { background: var(--green); }
+  .wizard-steps .wstep.current { background: var(--accent); }
+  .wizard-pane { display: none; }
+  .wizard-pane.active { display: block; animation: pane-in 0.18s ease-out; }
+  @keyframes pane-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .wizard-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .wizard-pane h3 { margin: 0 0 4px; font-size: 15.5px; color: var(--dark); }
+  .wizard-hint { font-size: 12px; color: var(--gray); line-height: 1.55; margin: 0 0 14px; }
+  .wizard-hint b { color: var(--dark); }
+  .wizard-example { background: #F5F6FB; border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px; font-size: 11.5px; color: var(--gray); line-height: 1.5; margin: -4px 0 14px; }
+  .wizard-example b { color: var(--dark); display: block; margin-bottom: 2px; font-size: 11px; }
+  .wizard-nav { display: flex; gap: 10px; margin-top: 4px; }
+  .wizard-nav button { flex: 1; }
+  .btn-secondary-sm { background: var(--bg); border: 1.5px solid var(--border); color: var(--dark); padding: 12px 20px; border-radius: 11px; cursor: pointer; font-weight: 700; font-size: 14px; }
+  .btn-secondary-sm:hover { background: #EEF2FF; border-color: var(--accent); }
+  .draft-saved-note { font-size: 11px; color: var(--gray-light); text-align: center; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .char-counter { font-size: 11px; color: var(--gray-light); text-align: right; margin: -8px 0 12px; }
+  .char-counter.ok { color: var(--green); }
 </style>
 </head>
 <body>
+
+<div id="toast-stack"></div>
 
 <div id="login-screen" class="login-box">
   <img class="logo-dot" src="assets/logo-icon.png" alt="Digital Aura" />
@@ -526,18 +569,54 @@
 
         <div class="card" id="create-card">
           <div class="card-head"><div><span class="eyebrow">Compose</span><h2>Create New Blog Topic</h2></div></div>
-          <select id="site-select"></select>
-          <input id="topic-input" type="text" placeholder="Topic (e.g. 'Local SEO Checklist for Hotels')" />
-          <textarea id="original-element-input" placeholder="Real result/fact to base this on (e.g. 'We took a hotel client from page 5 to #1 for jacuzzi suites near me in 3 months — 15,000 extra sessions, 160 monthly bookings')"></textarea>
-          <select id="blog-type-select">
-            <option value="general">Blog type: General / no fixed structure</option>
-            <option value="case_study">Blog type: Case Study (result-led, before/after)</option>
-            <option value="how_to">Blog type: How-To (numbered steps)</option>
-            <option value="comparison">Blog type: Comparison (X vs Y)</option>
-            <option value="listicle">Blog type: Listicle (numbered list)</option>
-          </select>
-          <button class="primary" id="create-topic-btn" onclick="createTopic()">Create draft task ▸</button>
+
+          <div class="wizard-steps">
+            <div class="wstep current" id="wstep-dot-1"></div>
+            <div class="wstep" id="wstep-dot-2"></div>
+            <div class="wstep" id="wstep-dot-3"></div>
+          </div>
+
+          <div class="wizard-pane active" data-wpane="1">
+            <div class="wizard-eyebrow">Step 1 of 3</div>
+            <h3>Which site, and what's the topic?</h3>
+            <p class="wizard-hint">Pick the site this post is for, then a specific, searchable topic — not a vague theme.</p>
+            <select id="site-select"></select>
+            <input id="topic-input" type="text" placeholder="e.g. 'Local SEO Checklist for Hotels'" />
+            <div class="wizard-example"><b>Good vs. vague</b>Good: "In-House Hire vs Digital Marketing Agency in Ahmedabad". Vague: "Digital marketing tips".</div>
+            <div class="wizard-nav"><button class="primary" onclick="wizardNext(1)">Next ▸</button></div>
+          </div>
+
+          <div class="wizard-pane" data-wpane="2">
+            <div class="wizard-eyebrow">Step 2 of 3</div>
+            <h3>What's the real fact this is built on?</h3>
+            <p class="wizard-hint">This is the <b>one required, non-skippable input</b> — a real client result, number, or firsthand fact. Without it the agent will refuse to draft (this is what stops the content from sounding generic/AI-written).</p>
+            <textarea id="original-element-input" placeholder="e.g. 'We took a hotel client's booking page from page 5 to #1 for jacuzzi suites near me in 90 days — 15,000 extra sessions, 160 monthly bookings'"></textarea>
+            <div class="char-counter" id="oe-counter">0 characters</div>
+            <div class="wizard-nav">
+              <button class="btn-secondary-sm" onclick="wizardBack(2)">◂ Back</button>
+              <button class="primary" onclick="wizardNext(2)">Next ▸</button>
+            </div>
+          </div>
+
+          <div class="wizard-pane" data-wpane="3">
+            <div class="wizard-eyebrow">Step 3 of 3</div>
+            <h3>Pick a structure</h3>
+            <p class="wizard-hint">This shapes how the agent organizes the article's headings.</p>
+            <select id="blog-type-select">
+              <option value="general">General / no fixed structure</option>
+              <option value="case_study">Case Study (result-led, before/after)</option>
+              <option value="how_to">How-To (numbered steps)</option>
+              <option value="comparison">Comparison (X vs Y)</option>
+              <option value="listicle">Listicle (numbered list)</option>
+            </select>
+            <div class="wizard-nav">
+              <button class="btn-secondary-sm" onclick="wizardBack(3)">◂ Back</button>
+              <button class="primary" id="create-topic-btn" onclick="createTopic()">Create draft task ▸</button>
+            </div>
+          </div>
+
           <div id="create-status" class="status-msg"></div>
+          <div class="draft-saved-note" id="draft-saved-note" style="display:none;">💾 Draft saved automatically — safe to come back later</div>
         </div>
         </div>
       </div>
@@ -745,7 +824,36 @@ async function showApp() {
   }
   renderGreeting();
   await loadData();
+  restoreComposeDraft();
   initPushNotifications();
+  startLivePolling();
+}
+
+/* ---------- Live polling: keep the panel in sync with what agents are doing,
+   without the user ever having to hit refresh. Skipped while a modal is open
+   or the tab is hidden/backgrounded, so it never interrupts an in-progress
+   action or wastes calls while the user isn't looking. ---------- */
+const LIVE_POLL_MS = 30000;
+let livePollTimer = null;
+
+function anyModalOpen() {
+  return [...document.querySelectorAll('.modal-backdrop')].some(m => getComputedStyle(m).display !== 'none');
+}
+
+function startLivePolling() {
+  if (livePollTimer) clearInterval(livePollTimer);
+  livePollTimer = setInterval(async () => {
+    if (document.hidden || anyModalOpen()) return;
+    const pill = document.querySelector('.pill.ok');
+    try {
+      if (pill) pill.classList.add('live-syncing');
+      await loadData();
+    } catch (e) {
+      console.warn('Live sync failed (non-fatal):', e.message);
+    } finally {
+      if (pill) pill.classList.remove('live-syncing');
+    }
+  }, LIVE_POLL_MS);
 }
 
 // Desktop push — mirrors the critical-only alerts that still email (automation
@@ -1479,7 +1587,9 @@ function renderRecent() {
 
 function renderSites(sites) {
   const el = document.getElementById('site-select');
+  const prevValue = el.value; // preserve selection across live-polling re-renders
   el.innerHTML = sites.map(s => `<option value="${s.id}">${escapeHtml(s.domain)}</option>`).join('');
+  if (prevValue && sites.some(s => s.id === prevValue)) el.value = prevValue;
 }
 
 window.handleApprove = (id) => handleAction(id, 'approve');
@@ -1493,12 +1603,108 @@ async function handleAction(taskId, action) {
     const data = await callPanelApi({ action, taskId });
     statusEl.textContent = data.message;
     statusEl.className = 'status-msg ' + (data.ok ? 'ok' : 'error');
+    showToast(data.message, data.ok ? 'ok' : 'error');
     if (data.ok) setTimeout(loadData, 1200);
   } catch (e) {
     statusEl.textContent = e.message;
     statusEl.className = 'status-msg error';
+    showToast(e.message, 'error');
   }
 }
+
+/* ---------- Toasts ---------- */
+function showToast(msg, kind) {
+  const stack = document.getElementById('toast-stack');
+  if (!stack) return;
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.innerHTML = `<span class="ic">${kind === 'ok' ? '✅' : kind === 'error' ? '⚠️' : 'ℹ️'}</span><span>${escapeHtml(msg)}</span>`;
+  stack.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('leaving');
+    setTimeout(() => el.remove(), 200);
+  }, kind === 'error' ? 5500 : 3800);
+}
+
+/* ---------- Compose wizard: step nav + autosave-to-localStorage ---------- */
+const WIZARD_DRAFT_KEY = 'seo-panel-compose-draft';
+let wizardStep = 1;
+
+function wizardShow(step) {
+  wizardStep = step;
+  document.querySelectorAll('.wizard-pane').forEach(p => p.classList.toggle('active', Number(p.dataset.wpane) === step));
+  [1, 2, 3].forEach(n => {
+    const dot = document.getElementById('wstep-dot-' + n);
+    if (!dot) return;
+    dot.classList.toggle('done', n < step);
+    dot.classList.toggle('current', n === step);
+  });
+}
+
+window.wizardNext = function (fromStep) {
+  if (fromStep === 1) {
+    const siteId = document.getElementById('site-select').value;
+    const topic = document.getElementById('topic-input').value.trim();
+    if (!siteId || !topic) { showToast('Pick a site and enter a topic first.', 'error'); return; }
+  }
+  if (fromStep === 2) {
+    const oe = document.getElementById('original-element-input').value.trim();
+    if (!oe || oe.length < 20) { showToast('Add a real result/fact — at least a sentence long.', 'error'); return; }
+  }
+  wizardShow(fromStep + 1);
+};
+
+window.wizardBack = function (fromStep) {
+  wizardShow(fromStep - 1);
+};
+
+function saveComposeDraft() {
+  const draft = {
+    siteId: document.getElementById('site-select')?.value || '',
+    topic: document.getElementById('topic-input')?.value || '',
+    originalElement: document.getElementById('original-element-input')?.value || '',
+    blogType: document.getElementById('blog-type-select')?.value || 'general',
+  };
+  localStorage.setItem(WIZARD_DRAFT_KEY, JSON.stringify(draft));
+  const note = document.getElementById('draft-saved-note');
+  if (note && (draft.topic || draft.originalElement)) note.style.display = 'flex';
+}
+
+function restoreComposeDraft() {
+  try {
+    const raw = localStorage.getItem(WIZARD_DRAFT_KEY);
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+    if (draft.topic) document.getElementById('topic-input').value = draft.topic;
+    if (draft.originalElement) document.getElementById('original-element-input').value = draft.originalElement;
+    if (draft.blogType) document.getElementById('blog-type-select').value = draft.blogType;
+    if (draft.siteId) document.getElementById('site-select').value = draft.siteId;
+    updateOeCounter();
+    if (draft.topic || draft.originalElement) document.getElementById('draft-saved-note').style.display = 'flex';
+  } catch (e) { /* corrupt/old draft — ignore */ }
+}
+
+function clearComposeDraft() {
+  localStorage.removeItem(WIZARD_DRAFT_KEY);
+  const note = document.getElementById('draft-saved-note');
+  if (note) note.style.display = 'none';
+}
+
+function updateOeCounter() {
+  const el = document.getElementById('original-element-input');
+  const counter = document.getElementById('oe-counter');
+  if (!el || !counter) return;
+  const len = el.value.trim().length;
+  counter.textContent = len + ' characters' + (len >= 20 ? '' : ' (add more detail)');
+  counter.classList.toggle('ok', len >= 20);
+}
+
+document.addEventListener('input', (e) => {
+  if (['site-select', 'topic-input', 'original-element-input', 'blog-type-select'].includes(e.target.id)) {
+    if (e.target.id === 'original-element-input') updateOeCounter();
+    saveComposeDraft();
+  }
+});
 
 window.createTopic = async function () {
   const siteId = document.getElementById('site-select').value;
@@ -1506,25 +1712,37 @@ window.createTopic = async function () {
   const originalElement = document.getElementById('original-element-input').value.trim();
   const blogType = document.getElementById('blog-type-select').value;
   const statusEl = document.getElementById('create-status');
+  const btn = document.getElementById('create-topic-btn');
   if (!siteId || !topic || !originalElement) {
     statusEl.textContent = 'Please fill in the site, topic, and a real result/fact to write from.';
     statusEl.className = 'status-msg error';
+    showToast('Something is missing — check all 3 steps.', 'error');
+    wizardShow(!siteId || !topic ? 1 : 2);
     return;
   }
   statusEl.textContent = 'Creating…';
   statusEl.className = 'status-msg';
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
   try {
     const res = await callPanelApi({ action: 'create_topic', siteId, topic, originalElement, blogType });
     statusEl.textContent = res.immediate
       ? 'Task created — drafting now, check back in ~1-2 minutes.'
       : 'Task created — the agent will draft it on its next scheduled run (within 15 min).';
     statusEl.className = 'status-msg ok';
+    showToast(res.immediate ? 'Draft task created — writing now.' : 'Draft task queued for next run.', 'ok');
     document.getElementById('topic-input').value = '';
     document.getElementById('original-element-input').value = '';
+    clearComposeDraft();
+    wizardShow(1);
     setTimeout(loadData, 1000);
   } catch (e) {
     statusEl.textContent = e.message;
     statusEl.className = 'status-msg error';
+    showToast('Could not create task: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create draft task ▸';
   }
 };
 
