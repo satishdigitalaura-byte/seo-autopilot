@@ -277,6 +277,8 @@
   .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
   .card-head .eyebrow { font-size: 10.5px; font-weight: 800; color: var(--gray-light); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
   .card-head h2 { font-size: 16px; color: var(--dark); margin: 0; font-weight: 800; letter-spacing: -0.01em; }
+  .card-head button { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; font-size: 12px; font-weight: 700; color: var(--accent); cursor: pointer; white-space: nowrap; }
+  .card-head button:hover { background: #EEF2FF; border-color: var(--accent); }
 
   .empty-state { text-align: center; padding: 26px 10px; }
   .empty-state .ic { width: 44px; height: 44px; border-radius: 50%; background: #DCFCE7; color: var(--green); display: flex; align-items: center; justify-content: center; font-size: 20px; margin: 0 auto 12px; }
@@ -563,6 +565,10 @@
           </div>
         </div>
         <div class="stat-row" id="stat-row"></div>
+        <div class="card" id="dashboard-notif-card">
+          <div class="card-head"><div><span class="eyebrow">Latest findings</span><h2>What the agents found recently</h2></div><button onclick="showTab('activity')">See all ▸</button></div>
+          <div id="dashboard-notifications-list"><div class="empty">Loading…</div></div>
+        </div>
       </div>
 
       <!-- ===== AGENTS TAB ===== -->
@@ -946,6 +952,7 @@ async function loadData() {
   renderFilterTabs();
   renderRecent();
   renderNotifications(data.notifications || []);
+  renderNotifications(data.notifications || [], 'dashboard-notifications-list', 5);
   renderSites(data.sites || []);
   renderKeywordTracker(data.keywordTracker || []);
   renderAnalytics(data.analytics || []);
@@ -1466,14 +1473,15 @@ function summarizeNotification(n) {
   }
 }
 
-function renderNotifications(items) {
-  const el = document.getElementById('notifications-list');
+function renderNotifications(items, elId = 'notifications-list', limit = 40) {
+  const el = document.getElementById(elId);
+  if (!el) return;
   const cards = items.map(n => ({ n, s: summarizeNotification(n) })).filter(x => x.s);
   if (!cards.length) {
     el.innerHTML = `<div class="empty">No notifications yet.</div>`;
     return;
   }
-  el.innerHTML = cards.slice(0, 40).map(({ n, s }) => `
+  el.innerHTML = cards.slice(0, limit).map(({ n, s }) => `
     <div class="notif-card">
       <div class="notif-head">
         <span class="notif-badge ${s.badge}">${s.badge}</span>
