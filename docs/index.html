@@ -1404,6 +1404,25 @@ function summarizeNotification(n) {
           : (r.summary ? `<p>${escapeHtml(r.summary)}</p>` : ''),
       };
     }
+    case 'eeat_agent': {
+      const worst = (r.pages || []).filter(p => p.findings?.length).sort((a, b) => a.score - b.score).slice(0, 3);
+      return {
+        badge: (r.averageScore ?? 0) >= 80 ? 'good' : 'warning', title: `E-E-A-T audit — avg score ${r.averageScore ?? '?'}/100 across ${r.pagesAudited ?? 0} pages`,
+        body: worst.length
+          ? `<ul>${worst.map(p => `<li><b>${escapeHtml(p.url)}</b> (${p.score}/100)<br><span style="color:var(--gray);">${p.findings.slice(0, 3).map(f => escapeHtml(f)).join(' • ')}</span></li>`).join('')}</ul>`
+          : (r.summary ? `<p>${escapeHtml(r.summary)}</p>` : ''),
+      };
+    }
+    case 'competitor_monitoring_agent': {
+      if (r.error) return { badge: 'warning', title: `Competitor check failed for ${escapeHtml(r.domain || 'a competitor')}`, body: `<p style="color:var(--gray);">${escapeHtml(r.error)}</p>` };
+      const newCount = (r.newSinceLastCheck || []).length;
+      if (r.firstRun) return { badge: 'info', title: `Competitor monitoring started for ${escapeHtml(r.domain || '')}`, body: `<p style="color:var(--gray);">${r.urlCount ?? 0} pages baselined — future runs will flag new pages here.</p>` };
+      return {
+        badge: newCount > 0 ? 'warning' : 'good',
+        title: newCount > 0 ? `${newCount} new page(s) on ${escapeHtml(r.domain || 'competitor site')}` : `No new pages on ${escapeHtml(r.domain || 'competitor site')}`,
+        body: newCount > 0 ? `<ul>${(r.newSinceLastCheck || []).slice(0, 5).map(u => `<li>${escapeHtml(u)}</li>`).join('')}</ul>` : '',
+      };
+    }
     case 'seo_audit_agent': {
       const topQueries = (r.strikingDistance || []).slice(0, 5);
       return {
